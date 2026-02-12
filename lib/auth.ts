@@ -50,7 +50,7 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                console.log("NextAuth Authorize: Success!");
+                console.log("NextAuth Authorize: Success for user ID:", user.id);
                 return {
                     id: user.id + "",
                     email: user.email,
@@ -67,6 +67,7 @@ export const authOptions: NextAuthOptions = {
     ],
     callbacks: {
         session: ({ session, token }) => {
+            console.log("NextAuth Callback: Session called", { token: !!token });
             return {
                 ...session,
                 user: {
@@ -77,6 +78,7 @@ export const authOptions: NextAuthOptions = {
             };
         },
         jwt: ({ token, user }) => {
+            console.log("NextAuth Callback: JWT called", { hasUser: !!user });
             if (user) {
                 const u = user as unknown as any;
                 return {

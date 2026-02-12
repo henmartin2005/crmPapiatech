@@ -17,9 +17,10 @@ export async function GET() {
             env: {
                 NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
                 NEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
+                NEXTAUTH_URL_VALUE: process.env.NEXTAUTH_URL || "not set",
                 POSTGRES_PRISMA_URL: !!process.env.POSTGRES_PRISMA_URL,
             },
-            timestamp: new Date().toISOString()
+            serverTime: new Date().toISOString(),
         });
     } catch (error: any) {
         console.error("Health Check Error:", error);
