@@ -11,52 +11,32 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-    const router = useRouter();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [debugLog, setDebugLog] = useState<string[]>([]);
-
-    const addLog = (msg: string) => {
-        const timestamp = new Date().toLocaleTimeString();
-        setDebugLog(prev => [`[${timestamp}] ${msg}`, ...prev]);
-        console.log(msg);
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        addLog("Login attempt started for: " + email);
         setLoading(true);
         setError(null);
 
         try {
-            addLog("Calling NextAuth signIn...");
             const result = await signIn("credentials", {
                 email,
                 password,
-                redirect: false,
+                callbackUrl: "/dashboard",
             });
-            addLog("NextAuth result: " + JSON.stringify(result));
 
             if (result?.error) {
-                addLog("Sign in error: " + result.error);
                 setError(result.error === "CredentialsSignin"
                     ? "Email o contraseña incorrectos."
-                    : "Error al iniciar sesión: " + result.error);
-            } else if (result?.ok) {
-                addLog("Sign in successful, redirecting...");
-                router.push("/dashboard");
-                router.refresh();
-            } else {
-                addLog("Sign in returned unexpected state.");
+                    : "Error al iniciar sesión.");
             }
         } catch (err: any) {
-            addLog("Unexpected login error: " + err.message);
-            setError("Ocurrió un error inesperado: " + (err.message || "Unknown error"));
+            setError("Ocurrió un error inesperado.");
         } finally {
             setLoading(false);
-            addLog("Login attempt finished.");
         }
     };
 
@@ -103,16 +83,6 @@ export default function LoginPage() {
                         </Button>
                     </form>
                 </CardContent>
-                {debugLog.length > 0 && (
-                    <CardFooter className="flex flex-col items-start gap-2 border-t pt-4">
-                        <p className="text-[10px] font-mono font-bold uppercase text-muted-foreground underline">Debug Log:</p>
-                        <div className="w-full max-h-32 overflow-y-auto bg-black p-2 rounded text-[10px] font-mono text-green-400">
-                            {debugLog.map((log, i) => (
-                                <div key={i}>{log}</div>
-                            ))}
-                        </div>
-                    </CardFooter>
-                )}
             </Card>
         </div>
     );
