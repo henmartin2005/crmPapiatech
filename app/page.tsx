@@ -1,108 +1,144 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
+import { signIn } from "next-auth/react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ShieldCheck, Users, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Eye, EyeOff, LogIn } from "lucide-react";
 
-export default function Home() {
+export default function HomePage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        callbackUrl: "/dashboard",
+        redirect: true
+      });
+
+      if (result?.error) {
+        setError(result.error === "CredentialsSignin"
+          ? "Email o contraseña incorrectos."
+          : "Error al iniciar sesión.");
+      }
+    } catch (err: any) {
+      setError("Ocurrió un error inesperado.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <header className="px-4 lg:px-6 h-20 flex items-center border-b bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <Link className="flex items-center justify-center gap-3" href="/">
+    <div className="relative flex flex-col items-center justify-center min-h-screen bg-[#FAFAFA] p-6 font-inter overflow-hidden">
+      {/* Orbes decorativos */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#7C3AED] rounded-full blur-[120px] opacity-10 animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#E91E90] rounded-full blur-[120px] opacity-10 animate-pulse" />
+
+      <div className="relative z-10 w-full flex flex-col items-center">
+        <div className="mb-6 transform hover:scale-105 transition-transform duration-500">
           <Image
             src="/logo-papia.png"
-            alt="Logo"
-            width={40}
-            height={40}
-            className="rounded-lg shadow-sm"
+            alt="Logo Papia Technology Solutions"
+            width={200}
+            height={200}
+            className="mx-auto"
+            priority
           />
-          <span className="font-bold text-lg md:text-xl text-slate-800 tracking-tight">
-            Papia Technology Solutions LLC
-          </span>
-        </Link>
-        <nav className="ml-auto hidden md:flex gap-4 sm:gap-6">
-          <Link className="text-sm font-semibold text-slate-600 hover:text-purple-600 transition-colors" href="#">
-            Características
-          </Link>
-          <Link className="text-sm font-semibold text-slate-600 hover:text-purple-600 transition-colors" href="#">
-            Precios
-          </Link>
-          <Link className="text-sm font-semibold text-slate-600 hover:text-purple-600 transition-colors" href="#">
-            Soporte
-          </Link>
-        </nav>
-      </header>
-      <main className="flex-1">
-        <section className="w-full py-20 md:py-32 bg-gradient-to-br from-white via-slate-50 to-purple-50">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center space-y-8 text-center">
-              <div className="space-y-4">
-                <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl bg-gradient-to-r from-purple-700 via-purple-600 to-pink-500 bg-clip-text text-transparent">
-                  Gestión de Pacientes Simplificada
-                </h1>
-                <p className="mx-auto max-w-[800px] text-slate-500 md:text-xl font-medium leading-relaxed">
-                  Optimiza el flujo de trabajo de tu clínica. Seguimiento de leads, gestión de citas y automatización con la tecnología de Papia Technology Solutions.
-                </p>
+        </div>
+
+        <h1 className="text-2xl md:text-3xl font-extrabold text-center mb-10 text-[#1a1a1a] font-outfit tracking-tight">
+          CRM Papia Technology Solutions LLC
+        </h1>
+
+        <Card className="w-full max-w-[400px] border-none shadow-[0_20px_50px_rgba(0,0,0,0.05)] rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-10">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="font-bold text-slate-800 text-sm ml-1">
+                  Correo electrónico
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="tu@correo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-white border-slate-100 focus:border-purple-300 focus:ring-purple-100 transition-all h-14 rounded-2xl px-5 text-base shadow-sm"
+                />
               </div>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/dashboard">
-                  <Button size="lg" className="h-14 px-8 rounded-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-500 hover:opacity-90 shadow-xl shadow-purple-200 transition-all active:scale-95">
-                    Ingresar al Sistema <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link href="/login">
-                  <Button variant="outline" size="lg" className="h-14 px-8 rounded-2xl font-bold border-2 border-slate-200 hover:bg-slate-50 transition-all">
+              <div className="space-y-2">
+                <Label htmlFor="password" title="Contraseña" className="font-bold text-slate-800 text-sm ml-1">
+                  Contraseña
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="bg-white border-slate-100 focus:border-purple-300 focus:ring-purple-100 transition-all h-14 pr-12 rounded-2xl px-5 text-base shadow-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-right px-1">
+                <a href="#" className="text-sm text-[#7C3AED] hover:text-[#E91E90] font-bold transition-colors">
+                  ¿Olvidaste tu contraseña?
+                </a>
+              </div>
+
+              {error && (
+                <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600 shadow-sm animate-in fade-in slide-in-from-top-2">
+                  <AlertDescription className="font-bold">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-14 rounded-2xl font-black text-lg bg-gradient-to-r from-[#7C3AED] to-[#E91E90] text-white hover:opacity-95 transition-all active:scale-[0.98] shadow-xl shadow-purple-200 mt-2 flex items-center justify-center gap-2"
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <>
+                    <LogIn className="h-5 w-5" />
                     Iniciar Sesión
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section className="w-full py-20 bg-white">
-          <div className="container px-4 md:px-6">
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="group flex flex-col items-center space-y-4 p-8 rounded-3xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-300">
-                <div className="p-4 bg-purple-100 text-purple-600 rounded-2xl group-hover:bg-gradient-to-br group-hover:from-purple-600 group-hover:to-pink-500 group-hover:text-white transition-all duration-300">
-                  <Users className="h-8 w-8" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800">Gestión de Leads</h2>
-                <p className="text-center text-slate-500 font-medium leading-relaxed">
-                  Visualiza tus pacientes en un tablero Kanban intuitivo. Nunca pierdas el rastro de un prospecto y aumenta tu conversión.
-                </p>
-              </div>
-              <div className="group flex flex-col items-center space-y-4 p-8 rounded-3xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-300">
-                <div className="p-4 bg-purple-100 text-purple-600 rounded-2xl group-hover:bg-gradient-to-br group-hover:from-purple-600 group-hover:to-pink-500 group-hover:text-white transition-all duration-300">
-                  <Zap className="h-8 w-8" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800">Automatización</h2>
-                <p className="text-center text-slate-500 font-medium leading-relaxed">
-                  Conexión directa con n8n para automatizar correos, mensajes y tareas repetitivas. Ahorra tiempo y recursos.
-                </p>
-              </div>
-              <div className="group flex flex-col items-center space-y-4 p-8 rounded-3xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-300">
-                <div className="p-4 bg-purple-100 text-purple-600 rounded-2xl group-hover:bg-gradient-to-br group-hover:from-purple-600 group-hover:to-pink-500 group-hover:text-white transition-all duration-300">
-                  <ShieldCheck className="h-8 w-8" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800">Seguro y Privado</h2>
-                <p className="text-center text-slate-500 font-medium leading-relaxed">
-                  Acceso basado en roles y cifrado de datos empresarial para mantener la información de tus pacientes siempre protegida.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-      <footer className="flex flex-col gap-4 sm:flex-row py-8 w-full shrink-0 items-center px-4 md:px-6 border-t bg-slate-50">
-        <p className="text-sm font-medium text-slate-500">© 2026 Papia Technology Solutions LLC. Todos los derechos reservados.</p>
-        <nav className="sm:ml-auto flex gap-6">
-          <Link className="text-sm font-semibold text-slate-500 hover:text-purple-600 transition-colors" href="#">
-            Términos de Servicio
-          </Link>
-          <Link className="text-sm font-semibold text-slate-500 hover:text-purple-600 transition-colors" href="#">
-            Privacidad
-          </Link>
-        </nav>
-      </footer>
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <footer className="mt-12 text-slate-400 text-sm font-bold tracking-wide">
+          © 2026 Papia Technology Solutions LLC
+        </footer>
+      </div>
     </div>
   );
 }
