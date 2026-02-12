@@ -21,7 +21,9 @@ export const authOptions: NextAuthOptions = {
                 password: { label: "Password", type: "password" },
             },
             async authorize(credentials) {
+                console.log("NextAuth Authorize attempt for:", credentials?.email);
                 if (!credentials?.email || !credentials.password) {
+                    console.log("NextAuth Authorize: Missing credentials");
                     return null;
                 }
 
@@ -32,18 +34,22 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 if (!user || !user.password) {
+                    console.log("NextAuth Authorize: User not found or no password");
                     return null;
                 }
 
+                console.log("NextAuth Authorize: Comparing passwords...");
                 const isPasswordValid = await bcrypt.compare(
                     credentials.password,
                     user.password
                 );
 
                 if (!isPasswordValid) {
+                    console.log("NextAuth Authorize: Invalid password");
                     return null;
                 }
 
+                console.log("NextAuth Authorize: Success!");
                 return {
                     id: user.id + "",
                     email: user.email,
