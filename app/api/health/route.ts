@@ -14,6 +14,11 @@ export async function GET() {
             status: "ok",
             database: "connected",
             userCount: userCount,
+            env: {
+                NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
+                NEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
+                POSTGRES_PRISMA_URL: !!process.env.POSTGRES_PRISMA_URL,
+            },
             timestamp: new Date().toISOString()
         });
     } catch (error: any) {
