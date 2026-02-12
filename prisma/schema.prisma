@@ -8,42 +8,35 @@ datasource db {
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-enum Role {
-  ADMIN
-  AGENT
-}
-
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          Role      @default(AGENT)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  accounts      Account[]
-  sessions      Session[]
+  id               String            @id @default(cuid())
+  name             String?
+  email            String?           @unique
+  emailVerified    DateTime?
+  image            String?
+  password         String?
+  role             Role              @default(AGENT)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  accounts         Account[]
   emailConnections EmailConnection[]
+  sessions         Session[]
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -56,61 +49,47 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-enum PatientStatus {
-  NEW
-  CONTACTED
-  PROPOSAL_SENT
-  PAYMENT_INITIAL
-  ACTIVE
-  INACTIVE
-  LOST
-}
-
 model Patient {
-  id                  String        @id @default(cuid())
+  id                  String         @id @default(cuid())
   fullName            String
   phone               String?
   email               String?
   country             String?
   source              String?
   serviceInterest     String?
-  status              PatientStatus @default(NEW)
-  autoFollowup        Boolean       @default(false)
-  followupCadenceDays Int           @default(7)
-  tags                Json?         // Array of strings
-  notes               String?       @db.Text
+  status              PatientStatus  @default(NEW)
+  autoFollowup        Boolean        @default(false)
+  followupCadenceDays Int            @default(7)
+  tags                Json?
+  notes               String?
   lastContactAt       DateTime?
-  
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  events              PatientEvent[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
   emailLogs           EmailLog[]
+  events              PatientEvent[]
 }
 
 model PatientEvent {
   id        String   @id @default(cuid())
   patientId String
-  type      String   // e.g. "NOTE", "EMAIL_SENT", "STATUS_CHANGE"
-  note      String?  @db.Text
+  type      String
+  note      String?
   meta      Json?
   createdAt DateTime @default(now())
-
   patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model EmailConnection {
   id                    String   @id @default(cuid())
   userId                String
-  provider              String   // gmail, microsoft, imap
-  accessTokenEncrypted  String?  @db.Text
-  refreshTokenEncrypted String?  @db.Text
-  settingsEncrypted     String?  @db.Text
+  provider              String
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  settingsEncrypted     String?
   fromEmail             String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model EmailLog {
@@ -119,9 +98,23 @@ model EmailLog {
   toEmail           String
   subject           String
   providerMessageId String?
-  status            String   // SENT, FAILED
-  error             String?  @db.Text
+  status            String
+  error             String?
   createdAt         DateTime @default(now())
+  patient           Patient? @relation(fields: [patientId], references: [id])
+}
 
-  patient Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+enum Role {
+  ADMIN
+  AGENT
+}
+
+enum PatientStatus {
+  NEW
+  CONTACTED
+  PROPOSAL_SENT
+  PAYMENT_INITIAL
+  ACTIVE
+  INACTIVE
+  LOST
 }
