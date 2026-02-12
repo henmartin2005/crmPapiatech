@@ -14,47 +14,52 @@ export default function LoginPage() {
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [debugLog, setDebugLog] = useState<string[]>([]);
+
+    const addLog = (msg: string) => {
+        const timestamp = new Date().toLocaleTimeString();
+        setDebugLog(prev => [`[${timestamp}] ${msg}`, ...prev]);
+        console.log(msg);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Login attempt started for:", email);
+        addLog("Login attempt started for: " + email);
         setLoading(true);
         setError(null);
 
         try {
-            console.log("Calling NextAuth signIn...");
+            addLog("Calling NextAuth signIn...");
             const result = await signIn("credentials", {
                 email,
                 password,
                 redirect: false,
             });
-            console.log("NextAuth result:", result);
+            addLog("NextAuth result: " + JSON.stringify(result));
 
             if (result?.error) {
-                console.error("Sign in error:", result.error);
+                addLog("Sign in error: " + result.error);
                 setError(result.error === "CredentialsSignin"
                     ? "Email o contraseña incorrectos."
                     : "Error al iniciar sesión: " + result.error);
             } else if (result?.ok) {
-                console.log("Sign in successful, redirecting to dashboard...");
+                addLog("Sign in successful, redirecting...");
                 router.push("/dashboard");
                 router.refresh();
             } else {
-                console.log("Sign in returned unexpected state:", result);
+                addLog("Sign in returned unexpected state.");
             }
         } catch (err: any) {
-            console.error("Unexpected login error:", err);
+            addLog("Unexpected login error: " + err.message);
             setError("Ocurrió un error inesperado: " + (err.message || "Unknown error"));
         } finally {
             setLoading(false);
-            console.log("Login attempt finished.");
+            addLog("Login attempt finished.");
         }
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-muted/20">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-muted/20 p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader>
                     <CardTitle className="text-2xl text-center">CRM Papiatech</CardTitle>
@@ -96,6 +101,16 @@ export default function LoginPage() {
                         </Button>
                     </form>
                 </CardContent>
+                {debugLog.length > 0 && (
+                    <CardFooter className="flex flex-col items-start gap-2 border-t pt-4">
+                        <p className="text-[10px] font-mono font-bold uppercase text-muted-foreground underline">Debug Log:</p>
+                        <div className="w-full max-h-32 overflow-y-auto bg-black p-2 rounded text-[10px] font-mono text-green-400">
+                            {debugLog.map((log, i) => (
+                                <div key={i}>{log}</div>
+                            ))}
+                        </div>
+                    </CardFooter>
+                )}
             </Card>
         </div>
     );
