@@ -19,26 +19,37 @@ export default function LoginPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("Login attempt started for:", email);
         setLoading(true);
         setError(null);
 
         try {
+            console.log("Calling NextAuth signIn...");
             const result = await signIn("credentials", {
                 email,
                 password,
                 redirect: false,
             });
+            console.log("NextAuth result:", result);
 
             if (result?.error) {
-                setError("Credenciales inválidas. Por favor intenta de nuevo.");
-            } else {
+                console.error("Sign in error:", result.error);
+                setError(result.error === "CredentialsSignin"
+                    ? "Email o contraseña incorrectos."
+                    : "Error al iniciar sesión: " + result.error);
+            } else if (result?.ok) {
+                console.log("Sign in successful, redirecting to dashboard...");
                 router.push("/dashboard");
                 router.refresh();
+            } else {
+                console.log("Sign in returned unexpected state:", result);
             }
-        } catch (err) {
-            setError("Ocurrió un error inesperado.");
+        } catch (err: any) {
+            console.error("Unexpected login error:", err);
+            setError("Ocurrió un error inesperado: " + (err.message || "Unknown error"));
         } finally {
             setLoading(false);
+            console.log("Login attempt finished.");
         }
     };
 
