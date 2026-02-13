@@ -17,13 +17,13 @@ import {
 import { supabase } from "@/lib/supabase";
 
 const sidebarItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Resumen" },
-    { href: "/dashboard/patients", icon: Users, label: "Client" },
-    { href: "/dashboard/appointments", icon: Calendar, label: "Citas" },
-    { href: "/dashboard/services", icon: Briefcase, label: "Servicios" },
-    { href: "/dashboard/traffic", icon: BarChart, label: "Tráfico Web" },
-    { href: "/dashboard/automations", icon: Workflow, label: "Automatizaciones" },
-    { href: "/dashboard/settings", icon: Settings, label: "Configuración" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
+    { href: "/dashboard/patients", icon: Users, label: "Clients" },
+    { href: "/dashboard/appointments", icon: Calendar, label: "Appointments" },
+    { href: "/dashboard/services", icon: Briefcase, label: "Services" },
+    { href: "/dashboard/traffic", icon: BarChart, label: "Traffic" },
+    { href: "/dashboard/automations", icon: Workflow, label: "Automations" },
+    { href: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
 
 export function Sidebar() {
@@ -38,8 +38,12 @@ export function Sidebar() {
 
     return (
         <div className="flex flex-col h-full border-r bg-muted/10 w-64 p-4 space-y-4">
-            <div className="flex items-center h-12 px-2">
-                <h1 className="text-xl font-bold tracking-tight text-primary">CRM Papiatech</h1>
+            <div className="flex flex-col items-center pt-0 pb-0 px-2 mb-0 shrink-0">
+                <img
+                    src="/logo-papia.png"
+                    alt="Papia Technology Solutions"
+                    className="h-48 w-auto object-contain mix-blend-multiply brightness-90 contrast-125 transition-all"
+                />
             </div>
 
             <nav className="flex-1 space-y-1">
@@ -73,7 +77,7 @@ export function Sidebar() {
                     onClick={handleSignOut}
                 >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Cerrar Sesión
+                    Sign Out
                 </Button>
             </div>
         </div>

@@ -42,18 +42,18 @@ export default function DashboardPage() {
     );
 
     const stats = [
-        { title: "Total Pacientes", value: "1,284", icon: Users, trend: "+12%", color: "text-blue-600" },
-        { title: "Citas Hoy", value: "12", icon: Calendar, trend: "En curso", color: "text-purple-600" },
-        { title: "Servicios Activos", value: "24", icon: Briefcase, trend: "+2", color: "text-pink-600" },
-        { title: "Crecimiento", value: "18%", icon: TrendingUp, trend: "+4.5%", color: "text-emerald-600" },
+        { title: "Total Clients", value: "1,284", icon: Users, trend: "+12%", color: "text-blue-600" },
+        { title: "Appointments Today", value: "12", icon: Calendar, trend: "In progress", color: "text-purple-600" },
+        { title: "Active Services", value: "24", icon: Briefcase, trend: "+2", color: "text-pink-600" },
+        { title: "Growth", value: "18%", icon: TrendingUp, trend: "+4.5%", color: "text-emerald-600" },
     ];
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
             <div className="flex flex-col space-y-2">
-                <h1 className="text-3xl font-extrabold tracking-tight font-outfit">Panel de Control</h1>
+                <h1 className="text-3xl font-extrabold tracking-tight font-jakarta">Dashboard Overview</h1>
                 <p className="text-muted-foreground font-medium">
-                    Bienvenido de nuevo, <span className="text-foreground font-bold">{email}</span>. Aquí tienes el resumen de hoy.
+                    Welcome back, <span className="text-foreground font-bold">{email}</span>. Here is today's summary.
                 </p>
             </div>
 
@@ -69,10 +69,10 @@ export default function DashboardPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-3xl font-black font-outfit">{stat.value}</div>
+                            <div className="text-3xl font-black font-jakarta">{stat.value}</div>
                             <p className="text-xs font-bold text-emerald-500 mt-1 flex items-center">
                                 {stat.trend}
-                                <span className="text-slate-400 font-medium ml-1">vs mes pasado</span>
+                                <span className="text-slate-400 font-medium ml-1">vs last month</span>
                             </p>
                         </CardContent>
                     </Card>
@@ -82,21 +82,21 @@ export default function DashboardPage() {
             <div className="grid gap-6 md:grid-cols-7">
                 <Card className="col-span-4 border-none shadow-sm rounded-3xl bg-white/50 backdrop-blur-sm">
                     <CardHeader>
-                        <CardTitle className="font-outfit font-bold">Actividad Reciente</CardTitle>
+                        <CardTitle className="font-jakarta font-bold">Recent Activity</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="h-[200px] flex items-center justify-center text-muted-foreground border-2 border-dashed border-slate-100 rounded-2xl">
-                            Visualización de actividad en desarrollo...
+                            Activity tracking coming soon...
                         </div>
                     </CardContent>
                 </Card>
                 <Card className="col-span-3 border-none shadow-sm rounded-3xl bg-white/50 backdrop-blur-sm">
                     <CardHeader>
-                        <CardTitle className="font-outfit font-bold">Próximas Citas</CardTitle>
+                        <CardTitle className="font-jakarta font-bold">Upcoming Appointments</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="h-[200px] flex items-center justify-center text-muted-foreground border-2 border-dashed border-slate-100 rounded-2xl">
-                            Lista de citas próximas...
+                            Appointment list loading...
                         </div>
                     </CardContent>
                 </Card>

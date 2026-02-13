@@ -44,7 +44,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }, [router, pathname]);
 
     if (!ready) {
-        return <div className="p-6 text-center mt-20">Cargando dashboard...</div>;
+        return <div className="p-6 text-center mt-20 font-jakarta">Loading dashboard...</div>;
     }
 
     return (

@@ -46,7 +46,7 @@ export function PatientDrawer({ open, onOpenChange, patientId }: PatientDrawerPr
         phone: "",
         country: "",
         source: "WhatsApp",
-        service: "General",
+        service: "InfoWeb Plan",
         status: "NEW",
         notes: "",
         auto_followup: false,
@@ -76,7 +76,7 @@ export function PatientDrawer({ open, onOpenChange, patientId }: PatientDrawerPr
                     phone: "",
                     country: "",
                     source: "WhatsApp",
-                    service: "General",
+                    service: "InfoWeb Plan",
                     status: "NEW",
                     notes: "",
                     auto_followup: false,
@@ -126,7 +126,7 @@ export function PatientDrawer({ open, onOpenChange, patientId }: PatientDrawerPr
                                 </AvatarFallback>
                             </Avatar>
                             <div>
-                                <DialogTitle className="text-3xl font-black font-outfit tracking-tight">
+                                <DialogTitle className="text-3xl font-black font-jakarta tracking-tight">
                                     {patientId ? "Edit Client" : "New Client"}
                                 </DialogTitle>
                                 <DialogDescription className="font-medium text-purple-100/80">
@@ -196,6 +196,27 @@ export function PatientDrawer({ open, onOpenChange, patientId }: PatientDrawerPr
                                             placeholder="+1 234 567 890"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="space-y-2 col-span-2 md:col-span-1">
+                                    <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Service Interested</Label>
+                                    <Select
+                                        value={patient.service}
+                                        onValueChange={(val) => setPatient({ ...patient, service: val })}
+                                    >
+                                        <SelectTrigger className="h-12 bg-white border-none rounded-2xl shadow-sm focus:ring-2 focus:ring-purple-200 transition-all font-semibold text-slate-700">
+                                            <SelectValue placeholder="Seleccionar servicio" />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-2xl border-none shadow-2xl p-1">
+                                            <SelectItem value="InfoWeb Plan" className="rounded-xl font-semibold">InfoWeb Plan</SelectItem>
+                                            <SelectItem value="Starter Plan" className="rounded-xl font-semibold">Starter Plan</SelectItem>
+                                            <SelectItem value="Chat AI Agent" className="rounded-xl font-semibold">Chat AI Agent</SelectItem>
+                                            <SelectItem value="Sistema de Citas" className="rounded-xl font-semibold">Sistema de Citas</SelectItem>
+                                            <SelectItem value="CRM Customizado" className="rounded-xl font-semibold">CRM Customizado</SelectItem>
+                                            <SelectItem value="Refresh Plan" className="rounded-xl font-semibold">Refresh Plan</SelectItem>
+                                            <SelectItem value="Mantenimiento + Ads" className="rounded-xl font-semibold">Mantenimiento + Ads</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <div className="space-y-2 col-span-2 md:col-span-1">
