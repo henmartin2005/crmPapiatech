@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,40 +14,58 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Eye, EyeOff, LogIn } from "lucide-react";
 
 export default function HomePage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Si ya hay sesión, manda al dashboard
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      if (data.session) router.replace("/dashboard");
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) router.replace("/dashboard");
+    });
+
+    return () => {
+      isMounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        callbackUrl: "/dashboard",
-        redirect: true
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (result?.error) {
-        setError(result.error === "CredentialsSignin"
-          ? "Email o contraseña incorrectos."
-          : "Error al iniciar sesión.");
-      }
-    } catch (err: any) {
-      setError("Ocurrió un error inesperado.");
-    } finally {
+    if (error || !data.user) {
       setLoading(false);
+      setError("Email o contraseña incorrectos.");
+      return;
     }
+
+    // Login OK
+    setLoading(false);
+    router.push("/dashboard");
+    router.refresh();
   };
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen bg-[#FAFAFA] p-6 font-inter overflow-hidden">
-      {/* Orbes decorativos */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#7C3AED] rounded-full blur-[120px] opacity-10 animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#E91E90] rounded-full blur-[120px] opacity-10 animate-pulse" />
 
@@ -81,8 +102,9 @@ export default function HomePage() {
                   className="bg-white border-slate-100 focus:border-purple-300 focus:ring-purple-100 transition-all h-14 rounded-2xl px-5 text-base shadow-sm"
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="password" title="Contraseña" className="font-bold text-slate-800 text-sm ml-1">
+                <Label htmlFor="password" className="font-bold text-slate-800 text-sm ml-1">
                   Contraseña
                 </Label>
                 <div className="relative">
@@ -99,6 +121,7 @@ export default function HomePage() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 transition-colors"
+                    aria-label="Mostrar/ocultar contraseña"
                   >
                     {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
                   </button>
@@ -106,13 +129,17 @@ export default function HomePage() {
               </div>
 
               <div className="text-right px-1">
+                {/* luego lo conectamos a reset password de Supabase */}
                 <a href="#" className="text-sm text-[#7C3AED] hover:text-[#E91E90] font-bold transition-colors">
                   ¿Olvidaste tu contraseña?
                 </a>
               </div>
 
               {error && (
-                <Alert variant="destructive" className="rounded-2xl border-none bg-red-50 text-red-600 shadow-sm animate-in fade-in slide-in-from-top-2">
+                <Alert
+                  variant="destructive"
+                  className="rounded-2xl border-none bg-red-50 text-red-600 shadow-sm animate-in fade-in slide-in-from-top-2"
+                >
                   <AlertDescription className="font-bold">{error}</AlertDescription>
                 </Alert>
               )}
