@@ -15,13 +15,13 @@ export interface UserProfile {
 
 // Para Client Components
 export function createClient() {
-  // Verificamos si las variables existen antes de inicializar para evitar errores en el build de Vercel
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+  // Durante el build de Vercel (prerendering), las variables de entorno pueden no estar presentes.
+  // Usamos placeholders que parezcan URLs válidas para evitar que @supabase/ssr lance un error fatal.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co"
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
 
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
 // Instancia lista para usar en componentes de cliente
-// Usamos una función autoinvocada para evitar errores si las variables faltan en el build
-export const supabase = typeof window !== 'undefined' ? createClient() : null as any
+export const supabase = createClient()
