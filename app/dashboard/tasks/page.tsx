@@ -21,14 +21,14 @@ import { Badge } from "@/components/ui/badge";
 
 type Task = {
     id: string;
-    patient_id: string;
+    client_id: string;
     title: string;
     description: string;
     due_date: string;
     status: string;
     created_at: string;
     completed_at: string | null;
-    patients?: { name: string } | null;
+    clients?: { name: string } | null;
 };
 
 type FilterType = "all" | "pending" | "completed";
@@ -43,7 +43,7 @@ export default function TasksPage() {
         setLoading(true);
         let query = supabase
             .from("client_tasks")
-            .select("*, patients(name)")
+            .select("*, clients(name)")
             .order("due_date", { ascending: true });
 
         if (filter === "pending") query = query.eq("status", "pending");
@@ -274,7 +274,7 @@ export default function TasksPage() {
                                                                     className="bg-purple-50 text-purple-700 border-none font-bold text-[10px] gap-1"
                                                                 >
                                                                     <User className="h-3 w-3" />
-                                                                    {task.patients?.name || "Sin cliente"}
+                                                                    {task.clients?.name || "Sin cliente"}
                                                                 </Badge>
                                                                 <div className="flex items-center gap-1 text-slate-400">
                                                                     <Clock className="h-3.5 w-3.5" />
@@ -369,7 +369,7 @@ export default function TasksPage() {
                                                                             ? "bg-amber-900/15 text-amber-900 border border-amber-800/20"
                                                                             : "bg-purple-100 text-purple-700"
                                                                     }`}
-                                                                title={`${t.title} - ${t.patients?.name || ""} (${formatTime(t.due_date)})${isOverdue ? " ⚠️ VENCIDA" : ""}`}
+                                                                title={`${t.title} - ${t.clients?.name || ""} (${formatTime(t.due_date)})${isOverdue ? " ⚠️ VENCIDA" : ""}`}
                                                             >
                                                                 {isOverdue && "⚠ "}{t.title}
                                                             </div>

@@ -24,7 +24,7 @@ import { supabase } from "@/lib/supabase/client";
 
 const sidebarItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
-    { href: "/dashboard/patients", icon: Users, label: "Clients" },
+    { href: "/dashboard/clients", icon: Users, label: "Clients" },
     { href: "/dashboard/appointments", icon: Calendar, label: "Appointments" },
     { href: "/dashboard/services", icon: Briefcase, label: "Services" },
     { href: "/dashboard/traffic", icon: BarChart, label: "Traffic" },

@@ -20,6 +20,7 @@ import {
     X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { InactivityBadge } from "./InactivityBadge";
 
 const KANBAN_COLUMNS = [
     { id: "NEW", title: "New Lead", color: "#3B82F6", border: "border-l-[#3B82F6]" },
@@ -30,48 +31,54 @@ const KANBAN_COLUMNS = [
     { id: "INACTIVE", title: "Inactive", color: "#6B7280", border: "border-l-[#6B7280]" },
 ];
 
-interface PatientKanbanProps {
-    onSelectPatient: (id: string) => void;
+interface ClientKanbanProps {
+    onSelectClient: (id: string) => void;
     sortBy: "created_at" | "updated_at";
     sortOrder: "asc" | "desc";
 }
 
-export function PatientKanban({ onSelectPatient, sortBy, sortOrder }: PatientKanbanProps) {
+export function ClientKanban({ onSelectClient, sortBy, sortOrder }: ClientKanbanProps) {
     const [columns, setColumns] = useState<Record<string, { id: string; title: string; color: string; border: string; items: any[] }>>({});
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-    const fetchPatients = useCallback(async () => {
-        const { data, error } = await supabase
-            .from("patients")
-            .select("*")
-            .order(sortBy, { ascending: sortOrder === "asc" });
+    const fetchClients = useCallback(async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from("clients")
+                .select("*")
+                .order(sortBy, { ascending: sortOrder === "asc" });
 
-        if (error) {
-            console.error("Error fetching patients:", error);
+            if (error) {
+                console.error("Error fetching clients:", error);
+                setLoading(false);
+                return;
+            }
+
+            const cols: Record<string, { id: string; title: string; color: string; border: string; items: any[] }> = {};
+            KANBAN_COLUMNS.forEach(col => {
+                cols[col.id] = { ...col, items: (data || []).filter(p => p.status === col.id) };
+            });
+            setColumns(cols);
+        } catch (err) {
+            console.error("Critical error in Kanban:", err);
+        } finally {
             setLoading(false);
-            return;
         }
-
-        const cols: Record<string, { id: string; title: string; color: string; border: string; items: any[] }> = {};
-        KANBAN_COLUMNS.forEach(col => {
-            cols[col.id] = { ...col, items: data.filter(p => p.status === col.id) };
-        });
-        setColumns(cols);
-        setLoading(false);
     }, [sortBy, sortOrder]);
 
     useEffect(() => {
-        fetchPatients();
+        fetchClients();
 
         // Stable real-time subscription
         const channel = supabase
             .channel("kanban-realtime")
             .on(
                 "postgres_changes",
-                { event: "*", schema: "public", table: "patients" },
+                { event: "*", schema: "public", table: "clients" },
                 () => {
-                    fetchPatients();
+                    fetchClients();
                 }
             )
             .subscribe();
@@ -79,7 +86,7 @@ export function PatientKanban({ onSelectPatient, sortBy, sortOrder }: PatientKan
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [fetchPatients]);
+    }, [fetchClients]);
 
     const onDragEnd = async (result: DropResult) => {
         if (!result.destination) return;
@@ -100,13 +107,13 @@ export function PatientKanban({ onSelectPatient, sortBy, sortOrder }: PatientKan
             });
 
             const { error } = await supabase
-                .from("patients")
+                .from("clients")
                 .update({ status: destination.droppableId, updated_at: new Date().toISOString() })
                 .eq("id", draggableId);
 
             if (error) {
                 console.error("Error updates status:", error);
-                fetchPatients();
+                fetchClients();
             }
         }
     };
@@ -122,15 +129,15 @@ export function PatientKanban({ onSelectPatient, sortBy, sortOrder }: PatientKan
         if (selectedIds.length === 0) return;
 
         const { error } = await supabase
-            .from("patients")
+            .from("clients")
             .update({ status: newStatus, updated_at: new Date().toISOString() })
             .in("id", selectedIds);
 
         if (error) {
-            console.error("Error bulk moving patients:", error);
+            console.error("Error bulk moving clients:", error);
         } else {
             setSelectedIds([]);
-            fetchPatients();
+            fetchClients();
         }
     };
 
@@ -231,7 +238,7 @@ export function PatientKanban({ onSelectPatient, sortBy, sortOrder }: PatientKan
                                                                     ref={provided.innerRef}
                                                                     {...provided.draggableProps}
                                                                     {...provided.dragHandleProps}
-                                                                    onClick={() => onSelectPatient(item.id)}
+                                                                    onClick={() => onSelectClient(item.id)}
                                                                     className="group outline-none relative"
                                                                 >
                                                                     {/* Checkbox on hover/selected */}
@@ -268,12 +275,22 @@ export function PatientKanban({ onSelectPatient, sortBy, sortOrder }: PatientKan
                                                                             </div>
 
                                                                             <div className="flex flex-col gap-1.5">
-                                                                                {item.phone && (
-                                                                                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600 leading-none">
-                                                                                        <Phone className="h-3 w-3 text-slate-400" />
-                                                                                        {item.phone}
-                                                                                    </div>
-                                                                                )}
+                                                                                <div className="flex items-center justify-between">
+                                                                                    {item.phone && (
+                                                                                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600 leading-none">
+                                                                                            <Phone className="h-3 w-3 text-slate-400" />
+                                                                                            {item.phone}
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {item.estimated_budget && (
+                                                                                        <div className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[9px] font-black border border-emerald-100/50">
+                                                                                            {item.estimated_budget}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                                
+                                                                                <InactivityBadge lastContactAt={item.last_contact_at} className="mt-1" />
+
                                                                                 <div className="pt-1.5 border-t border-slate-50 flex flex-col gap-1">
                                                                                     <div className="flex items-center justify-between text-[8px] font-bold text-slate-400 uppercase tracking-tighter leading-none">
                                                                                         <span className="flex items-center gap-1">
@@ -307,3 +324,7 @@ export function PatientKanban({ onSelectPatient, sortBy, sortOrder }: PatientKan
         </div>
     );
 }
+
+const XIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+);

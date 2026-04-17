@@ -41,7 +41,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase/client";
 
-export type Patient = {
+export type Client = {
     id: string;
     name: string;
     status: string;
@@ -61,7 +61,7 @@ const getSourceIcon = (source: string) => {
     }
 };
 
-export const columns: ColumnDef<Patient>[] = [
+export const columns: ColumnDef<Client>[] = [
     {
         accessorKey: "name",
         header: ({ column }) => {
@@ -130,7 +130,7 @@ export const columns: ColumnDef<Patient>[] = [
     {
         id: "actions",
         cell: ({ row }) => {
-            const patient = row.original;
+            const client = row.original;
             return (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -144,7 +144,7 @@ export const columns: ColumnDef<Patient>[] = [
                         <DropdownMenuItem
                             onClick={(e) => {
                                 e.stopPropagation();
-                                navigator.clipboard.writeText(patient.phone);
+                                navigator.clipboard.writeText(client.phone);
                             }}
                             className="rounded-lg font-semibold text-sm"
                         >
@@ -160,16 +160,16 @@ export const columns: ColumnDef<Patient>[] = [
     },
 ];
 
-export function PatientTable({ onSelectPatient }: { onSelectPatient: (id: string) => void }) {
-    const [data, setData] = useState<Patient[]>([]);
+export function ClientTable({ onSelectClient }: { onSelectClient: (id: string) => void }) {
+    const [data, setData] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
-    const fetchPatients = async () => {
+    const fetchClients = async () => {
         setLoading(true);
         const { data, error } = await supabase
-            .from("patients")
+            .from("clients")
             .select("*")
             .order("created_at", { ascending: false });
 
@@ -180,12 +180,12 @@ export function PatientTable({ onSelectPatient }: { onSelectPatient: (id: string
     };
 
     useEffect(() => {
-        fetchPatients();
+        fetchClients();
 
         const channel = supabase
             .channel("list_changes")
-            .on("postgres_changes", { event: "*", schema: "public", table: "patients" }, () => {
-                fetchPatients();
+            .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => {
+                fetchClients();
             })
             .subscribe();
 
@@ -255,7 +255,7 @@ export function PatientTable({ onSelectPatient }: { onSelectPatient: (id: string
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    onClick={() => onSelectPatient(row.original.id)}
+                                    onClick={() => onSelectClient(row.original.id)}
                                     className="cursor-pointer hover:bg-slate-50 transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
