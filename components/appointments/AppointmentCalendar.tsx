@@ -21,12 +21,12 @@ import { cn } from "@/lib/utils";
 
 type Task = {
     id: string;
-    patient_id: string;
+    client_id: string;
     title: string;
     description: string;
     due_date: string;
     status: string;
-    patients: {
+    clients: {
         name: string;
         phone: string;
     };
@@ -45,7 +45,7 @@ export function AppointmentCalendar() {
 
         const { data, error } = await supabase
             .from("client_tasks")
-            .select("*, patients(name, phone)")
+            .select("*, clients(name, phone)")
             .gte("due_date", start)
             .lte("due_date", end)
             .order("due_date", { ascending: true });
@@ -211,7 +211,7 @@ export function AppointmentCalendar() {
                                                 <div className="flex flex-wrap items-center gap-4 mt-2">
                                                     <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium font-jakarta">
                                                         <User className="h-3.5 w-3.5 text-purple-500" />
-                                                        {appointment.patients?.name || "Sin cliente"}
+                                                        {appointment.clients?.name || "Sin cliente"}
                                                     </div>
                                                     <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                                                         <Clock className="h-3.5 w-3.5 text-blue-500" />

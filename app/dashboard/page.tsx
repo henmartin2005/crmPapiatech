@@ -20,7 +20,7 @@ type Activity = {
     id: string;
     content: string;
     created_at: string;
-    patients?: { name: string };
+    clients?: { name: string };
 };
 
 type Task = {
@@ -28,7 +28,7 @@ type Task = {
     title: string;
     due_date: string;
     status: string;
-    patients?: { name: string };
+    clients?: { name: string };
 };
 
 export default function DashboardPage() {
@@ -43,50 +43,55 @@ export default function DashboardPage() {
         let mounted = true;
 
         const fetchData = async () => {
-            // 1. Auth check
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError || !user) {
-                router.replace("/");
-                return;
+            try {
+                // 1. Auth check
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+                if (authError || !user) {
+                    router.replace("/");
+                    return;
+                }
+
+                if (!mounted) return;
+                setEmail(user.email ?? null);
+
+                // 2. Fetch Stats
+                const [
+                    totalClientsRes,
+                    appointmentsTodayRes,
+                    activeServicesRes,
+                    activityRes,
+                    tasksRes
+                ] = await Promise.all([
+                    supabase.from("clients").select("*", { count: "exact", head: true }),
+                    supabase.from("client_tasks").select("*", { count: "exact", head: true })
+                        .eq("status", "pending")
+                        .gte("due_date", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+                        .lte("due_date", new Date(new Date().setHours(23, 59, 59, 999)).toISOString()),
+                    supabase.from("clients").select("service"), 
+                    supabase.from("client_notes").select("id, content, created_at, clients(name)").order("created_at", { ascending: false }).limit(5),
+                    supabase.from("client_tasks").select("id, title, due_date, status, clients(name)").eq("status", "pending").order("due_date", { ascending: true }).limit(5)
+                ]);
+
+                if (!mounted) return;
+
+                // Process unique services
+                const servicesData = activeServicesRes.data || [];
+                const uniqueServices = new Set(servicesData.map((p: any) => p.service)).size;
+
+                setStats([
+                    { title: "Total Clientes", value: (totalClientsRes.count || 0).toString(), icon: Users, trend: "+12%", color: "text-blue-600" },
+                    { title: "Tareas hoy", value: (appointmentsTodayRes.count || 0).toString(), icon: Calendar, trend: "En progreso", color: "text-purple-600" },
+                    { title: "Planes Activos", value: uniqueServices.toString(), icon: Briefcase, trend: "+2", color: "text-pink-600" },
+                    { title: "Crecimiento", value: "18%", icon: TrendingUp, trend: "+4.5%", color: "text-emerald-600" },
+                ]);
+
+                setRecentActivity((activityRes.data as any) || []);
+                setUpcomingTasks((tasksRes.data as any) || []);
+            } catch (err) {
+                console.error("Error in Dashboard fetchData:", err);
+            } finally {
+                if (mounted) setLoading(false);
             }
-
-            if (!mounted) return;
-            setEmail(user.email ?? null);
-
-            // 2. Fetch Stats
-            const [
-                totalClientsRes,
-                appointmentsTodayRes,
-                activeServicesRes,
-                activityRes,
-                tasksRes
-            ] = await Promise.all([
-                supabase.from("patients").select("*", { count: "exact", head: true }),
-                supabase.from("client_tasks").select("*", { count: "exact", head: true })
-                    .eq("status", "pending")
-                    .gte("due_date", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-                    .lte("due_date", new Date(new Date().setHours(23, 59, 59, 999)).toISOString()),
-                supabase.from("patients").select("service"), 
-                supabase.from("client_notes").select("id, content, created_at, patients(name)").order("created_at", { ascending: false }).limit(5),
-                supabase.from("client_tasks").select("id, title, due_date, status, patients(name)").eq("status", "pending").order("due_date", { ascending: true }).limit(5)
-            ]);
-
-            if (!mounted) return;
-
-            // Process unique services
-            const servicesData = activeServicesRes.data || [];
-            const uniqueServices = new Set(servicesData.map((p: any) => p.service)).size;
-
-            setStats([
-                { title: "Total Clientes", value: (totalClientsRes.count || 0).toString(), icon: Users, trend: "+12%", color: "text-blue-600" },
-                { title: "Tareas hoy", value: (appointmentsTodayRes.count || 0).toString(), icon: Calendar, trend: "En progreso", color: "text-purple-600" },
-                { title: "Planes Activos", value: uniqueServices.toString(), icon: Briefcase, trend: "+2", color: "text-pink-600" },
-                { title: "Crecimiento", value: "18%", icon: TrendingUp, trend: "+4.5%", color: "text-emerald-600" },
-            ]);
-
-            setRecentActivity((activityRes.data as any) || []);
-            setUpcomingTasks((tasksRes.data as any) || []);
-            setLoading(false);
         };
 
         fetchData();
@@ -140,7 +145,7 @@ export default function DashboardPage() {
                             <MessageSquare className="h-5 w-5 text-purple-500" />
                             Actividad Reciente
                         </CardTitle>
-                        <button onClick={() => router.push("/dashboard/patients")} className="text-xs font-bold text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1">
+                        <button onClick={() => router.push("/dashboard/clients")} className="text-xs font-bold text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1">
                             Ver todo <ChevronRight className="h-3 w-3" />
                         </button>
                     </CardHeader>
@@ -154,7 +159,7 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
-                                                <p className="text-sm font-bold text-slate-800 truncate">{activity.patients?.name || "Cliente"}</p>
+                                                <p className="text-sm font-bold text-slate-800 truncate">{activity.clients?.name || "Cliente"}</p>
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase">
                                                     {format(parseISO(activity.created_at), "HH:mm", { locale: es })}
                                                 </span>
@@ -192,7 +197,7 @@ export default function DashboardPage() {
                                             <p className="text-sm font-bold text-slate-800 truncate">{task.title}</p>
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase">
-                                                    {task.patients?.name || "Cliente"}
+                                                    {task.clients?.name || "Cliente"}
                                                 </span>
                                                 <span className="text-[10px] text-slate-300">•</span>
                                                 <span className={`text-[10px] font-black uppercase ${isToday(parseISO(task.due_date)) ? "text-amber-500" : "text-slate-400"}`}>
