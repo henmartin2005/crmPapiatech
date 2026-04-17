@@ -39,7 +39,7 @@ import {
     Phone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 export type Patient = {
     id: string;

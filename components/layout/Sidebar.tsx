@@ -20,7 +20,7 @@ import {
     PanelLeft,
 } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 const sidebarItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },

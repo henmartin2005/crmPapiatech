@@ -19,7 +19,7 @@ import {
     Trash2,
     X
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 const KANBAN_COLUMNS = [
     { id: "NEW", title: "New Lead", color: "#3B82F6", border: "border-l-[#3B82F6]" },

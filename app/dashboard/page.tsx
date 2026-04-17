@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Calendar, Briefcase, TrendingUp, MessageSquare, Clock, CheckCircle2, ChevronRight } from "lucide-react";
 import { format, isToday, isFuture, parseISO } from "date-fns";

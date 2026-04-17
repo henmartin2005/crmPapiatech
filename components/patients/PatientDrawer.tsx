@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/select";
 
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 interface PatientDrawerProps {
     open: boolean;
