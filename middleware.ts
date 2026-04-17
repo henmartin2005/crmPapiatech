@@ -42,7 +42,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
+  // Si el usuario ya está autenticado e intenta ir a /login, mandarlo al dashboard
+  // EXCEPCIÓN: Si hay un error en la URL (ej. cuenta desactivada), no redirigir para evitar bucles.
+  if (user && request.nextUrl.pathname === '/login' && !request.nextUrl.searchParams.has('error')) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
