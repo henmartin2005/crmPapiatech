@@ -27,13 +27,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
         <h2 className="text-xl font-bold mb-2">Configurando tu cuenta...</h2>
-        <p className="text-muted-foreground mb-4">Estamos preparando tu perfil de CRM. Esto solo tardará un momento.</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-        >
-          Reintentar ahora
-        </button>
+        <p className="text-muted-foreground mb-4">Estamos preparando tu perfil de CRM. Por favor, refresca la página en unos segundos.</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
       </div>
     )
   }
