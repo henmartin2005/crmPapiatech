@@ -19,6 +19,7 @@ import {
     PanelLeftClose,
     PanelLeft,
 } from "lucide-react";
+import { UserMenu } from "@/components/UserMenu";
 import { supabase } from "@/lib/supabase";
 
 const sidebarItems = [
@@ -59,11 +60,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         return () => clearInterval(interval);
     }, []);
 
-    const handleSignOut = async () => {
-        await supabase.auth.signOut();
-        router.replace("/");
-        router.refresh();
-    };
 
     return (
         <div
@@ -146,21 +142,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 })}
             </nav>
 
-            {/* Sign Out */}
-            <div className="pt-4 border-t">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    className={cn(
-                        "w-full text-muted-foreground hover:text-destructive transition-all",
-                        collapsed ? "justify-center px-0" : "justify-start"
-                    )}
-                    onClick={handleSignOut}
-                    title={collapsed ? "Sign Out" : undefined}
-                >
-                    <LogOut className={cn("h-4 w-4 shrink-0", !collapsed && "mr-2")} />
-                    {!collapsed && "Sign Out"}
-                </Button>
+            <div className="pt-4 border-t flex justify-center">
+                <UserMenu />
             </div>
         </div>
     );

@@ -1,56 +1,50 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { DashboardShell } from "@/components/layout/Shell";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const router = useRouter();
-    const pathname = usePathname();
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createServerSupabaseClient()
+  
+  // IMPORTANTE: Usar getUser() en el servidor para validar el token JWT
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-    const [ready, setReady] = useState(false);
+  if (!user || userError) {
+    redirect('/login')
+  }
 
-    useEffect(() => {
-        let mounted = true;
+  // Obtener perfil con rol para verificar si está activo
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
 
-        const check = async () => {
-            const { data } = await supabase.auth.getSession();
-            const session = data.session;
-
-            if (!session) {
-                // si no hay sesión, sacalo de /dashboard
-                router.replace("/");
-                return;
-            }
-
-            if (mounted) setReady(true);
-        };
-
-        check();
-
-        // opcional: si la sesión cambia (logout en otra pestaña), lo saca
-        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (!session && pathname.startsWith("/dashboard")) {
-                router.replace("/");
-            }
-        });
-
-        return () => {
-            mounted = false;
-            sub.subscription.unsubscribe();
-        };
-    }, [router, pathname]);
-
-    if (!ready) {
-        return <div className="p-6 text-center mt-20 font-jakarta">Loading dashboard...</div>;
-    }
-
+  // Si no hay perfil, el usuario acaba de entrar por primera vez.
+  // En lugar de redirigir (que causa un loop con el middleware),
+  // mostramos un mensaje de espera o error amigable.
+  if (!profile || profileError) {
     return (
-        <DashboardShell>
-            {children}
-        </DashboardShell>
-    );
-}
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+        <h2 className="text-xl font-bold mb-2">Configurando tu cuenta...</h2>
+        <p className="text-muted-foreground mb-4">Estamos preparando tu perfil de CRM. Esto solo tardará un momento.</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Reintentar ahora
+        </button>
+      </div>
+    )
+  }
 
+  // Verificar si el usuario está activo
+  if (!profile.is_active) {
+    redirect('/login?error=account_disabled')
+  }
+
+  return (
+    <DashboardShell>
+      {children}
+    </DashboardShell>
+  )
+}
