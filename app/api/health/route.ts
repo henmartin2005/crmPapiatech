@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+    const supabase = await createServerSupabaseClient()
+    
     const { data, error } = await supabase
         .from('estados')
         .select('id,nombre')
@@ -22,4 +24,3 @@ export async function GET() {
         serverTime: new Date().toISOString(),
     })
 }
-
