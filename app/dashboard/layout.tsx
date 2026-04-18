@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { DashboardShell } from "@/components/layout/Shell";
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { revalidatePath } from 'next/cache';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient()
@@ -14,23 +16,48 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   // Obtener perfil con rol para verificar si está activo
-  const { data: profile, error: profileError } = await supabase
+  let { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
-  // Si no hay perfil, el usuario acaba de entrar por primera vez.
-  // En lugar de redirigir (que causa un loop con el middleware),
-  // mostramos un mensaje de espera o error amigable.
+  // Si no hay perfil, el usuario acaba de entrar por primera vez o el trigger falló.
+  // Intentamos crear el perfil automáticamente con privilegios de admin.
   if (!profile || profileError) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-        <h2 className="text-xl font-bold mb-2">Configurando tu cuenta...</h2>
-        <p className="text-muted-foreground mb-4">Estamos preparando tu perfil de CRM. Por favor, refresca la página en unos segundos.</p>
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-      </div>
-    )
+    console.log(`Perfil no encontrado para el usuario ${user.id}. Intentando crear automáticamente...`)
+    
+    const { data: newProfile, error: createError } = await supabaseAdmin
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Nuevo Usuario',
+        role: 'admin', // Rol por defecto, ajustable luego
+        is_active: true,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
+      .select('*')
+      .single()
+
+    if (newProfile && !createError) {
+      profile = newProfile
+      console.log(`Perfil creado exitosamente para: ${user.email}`)
+      // Forzar revalidación para asegurar que el cliente vea el cambio
+      revalidatePath('/dashboard', 'layout')
+    } else {
+      console.error('Error al crear perfil automático:', createError)
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+          <h2 className="text-xl font-bold mb-2">Configurando tu cuenta...</h2>
+          <p className="text-muted-foreground mb-4">
+            Estamos preparando tu perfil de CRM. Por favor, refresca la página en unos segundos.
+            {createError && <span className="block text-xs mt-2 text-red-400">Error: {createError.message}</span>}
+          </p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        </div>
+      )
+    }
   }
 
   // Verificar si el usuario está activo
