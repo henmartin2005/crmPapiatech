@@ -27,35 +27,59 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!profile || profileError) {
     console.log(`Perfil no encontrado para el usuario ${user.id}. Intentando crear automáticamente...`)
     
-    const { data: newProfile, error: createError } = await supabaseAdmin
-      .from('profiles')
-      .upsert({
-        id: user.id,
-        email: user.email,
-        role: 'usuario', // Rol por defecto más seguro
-      }, { onConflict: 'id' })
-      .select('*')
-      .single()
-
-    if (newProfile && !createError) {
-      profile = newProfile
-      console.log(`Perfil creado exitosamente para: ${user.email}`)
-    } else {
-      console.error('Error al crear perfil automático:', createError)
+    // Verificación CRÍTICA de variables de entorno para producción
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-          <h2 className="text-xl font-bold mb-2">Configurando tu cuenta...</h2>
-          <p className="text-muted-foreground mb-4">
-            Estamos preparando tu perfil de CRM. Por favor, refresca la página en unos segundos.
-            {createError && <span className="block text-xs mt-2 text-red-400">Error: {createError.message}</span>}
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-slate-50">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Error de Configuración (Panel de Hosting)</h2>
+          <p className="text-slate-500 mb-4 max-w-md">
+            Falta la variable <code className="bg-red-50 text-red-600 px-1 py-0.5 rounded">SUPABASE_SERVICE_ROLE_KEY</code>. 
+            El sistema no puede crear tu perfil automáticamente sin ella. Por favor, añádela en Vercel/Netlify.
           </p>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        </div>
+      )
+    }
+
+    try {
+      const { data: newProfile, error: createError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          email: user.email,
+          role: 'usuario', // Rol por defecto más seguro
+        }, { onConflict: 'id' })
+        .select('*')
+        .single()
+
+      if (createError) {
+        throw createError;
+      }
+
+      if (newProfile) {
+        console.log(`Perfil creado exitosamente para: ${user.email}`)
+        // Limpiamos caché y forzamos recarga para que el nuevo perfil se aplique correctamente
+        revalidatePath('/dashboard', 'layout');
+        redirect('/dashboard');
+      }
+    } catch (err: any) {
+      console.error('Error al crear perfil automático:', err)
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-slate-50">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Error al configurar tu perfil</h2>
+          <p className="text-slate-500 mb-4 max-w-md">
+            No pudimos completar la configuración inicial. 
+          </p>
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs font-mono text-left max-w-md overflow-x-auto">
+            {err?.message || JSON.stringify(err)}
+          </div>
+          <p className="text-xs text-slate-400 mt-4">Actualiza la página para reintentar.</p>
         </div>
       )
     }
   }
 
   // La verificación de is_active se omite si la columna no existe en el esquema actual
+
 
   return (
     <DashboardShell>
