@@ -57,9 +57,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       if (newProfile) {
         console.log(`Perfil creado exitosamente para: ${user.email}`)
-        // Limpiamos caché y forzamos recarga para que el nuevo perfil se aplique correctamente
-        revalidatePath('/dashboard', 'layout');
-        redirect('/dashboard');
+        profile = newProfile;
       }
     } catch (err: any) {
       console.error('Error al crear perfil automático:', err)
