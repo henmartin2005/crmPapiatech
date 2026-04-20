@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
 import {
     ColumnDef,
     flexRender,
     getCoreRowModel,
-    getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
+    getFilteredRowModel,
     useReactTable,
     SortingState,
-    ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -18,181 +19,137 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-    MoreHorizontal,
-    ArrowUpDown,
-    Loader2,
-    Instagram,
-    Facebook,
-    MessageCircle,
-    Tag,
-    User,
-    Phone
+import { 
+    Loader2, 
+    ChevronLeft, 
+    ChevronRight, 
+    Search,
+    Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase/client";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn, normalizeStatus } from "@/lib/utils";
+import { InactivityBadge } from "./InactivityBadge";
 
 export type Client = {
     id: string;
     name: string;
-    status: string;
     email: string;
     phone: string;
+    status: string;
+    lead_source: string;
     service: string;
+    estimated_budget: string;
+    last_contact_at: string;
     created_at: string;
-    source: string;
 };
 
-const getSourceIcon = (source: string) => {
-    switch (source) {
-        case "WhatsApp": return <MessageCircle className="h-4 w-4 text-green-500" />;
-        case "Instagram": return <Instagram className="h-4 w-4 text-pink-500" />;
-        case "Facebook": return <Facebook className="h-4 w-4 text-blue-600" />;
-        default: return <Tag className="h-4 w-4 text-slate-400" />;
-    }
-};
-
-export const columns: ColumnDef<Client>[] = [
-    {
-        accessorKey: "name",
-        header: ({ column }) => {
-            return (
-                <Button
-                    variant="ghost"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                    className="hover:bg-transparent font-black uppercase text-[10px] tracking-wider p-0 h-auto"
-                >
-                    Nombre del Cliente
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                </Button>
-            );
-        },
-        cell: ({ row }) => (
-            <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-purple-50 flex items-center justify-center border border-purple-100">
-                    <User className="h-4 w-4 text-purple-600" />
-                </div>
-                <span className="font-bold text-slate-700">{row.getValue("name")}</span>
-            </div>
-        )
-    },
-    {
-        accessorKey: "status",
-        header: "Estado",
-        cell: ({ row }) => {
-            const status = row.getValue("status") as string;
-            const statusMap: Record<string, { label: string, color: string }> = {
-                "NEW": { label: "Nuevo Contacto", color: "bg-purple-50 text-purple-600 border-purple-100" },
-                "CONTACTED": { label: "Conversación", color: "bg-blue-50 text-blue-600 border-blue-100" },
-                "PROPOSAL_SENT": { label: "Presupuesto", color: "bg-amber-50 text-amber-600 border-amber-100" },
-                "PAYMENT_INITIAL": { label: "Pago Inicial", color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
-                "ACTIVE": { label: "Tratamiento", color: "bg-pink-50 text-pink-600 border-pink-100" },
-                "INACTIVE": { label: "Inactivo", color: "bg-slate-50 text-slate-600 border-slate-100" },
-            };
-            const config = statusMap[status] || { label: status, color: "bg-slate-50 text-slate-500" };
-
-            return (
-                <Badge variant="outline" className={`rounded-lg font-black text-[9px] uppercase tracking-wider py-0.5 px-2 ${config.color}`}>
-                    {config.label}
-                </Badge>
-            );
-        }
-    },
-    {
-        accessorKey: "phone",
-        header: "Contacto",
-        cell: ({ row }) => (
-            <div className="flex flex-col gap-0.5">
-                <div className="text-xs font-bold text-slate-700">{row.original.phone}</div>
-                <div className="text-[10px] font-medium text-slate-400">{row.original.email}</div>
-            </div>
-        )
-    },
-    {
-        accessorKey: "source",
-        header: "Fuente",
-        cell: ({ row }) => (
-            <div className="flex items-center gap-2">
-                {getSourceIcon(row.original.source)}
-                <span className="text-[11px] font-bold text-slate-600">{row.original.source}</span>
-            </div>
-        )
-    },
-    {
-        id: "actions",
-        cell: ({ row }) => {
-            const client = row.original;
-            return (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4 text-slate-400" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-xl border-none shadow-2xl p-1">
-                        <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-3 py-2">Acciones</DropdownMenuLabel>
-                        <DropdownMenuItem
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                navigator.clipboard.writeText(client.phone);
-                            }}
-                            className="rounded-lg font-semibold text-sm"
-                        >
-                            <span className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" /> Copiar Teléfono</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-lg font-semibold text-sm">
-                            <span className="flex items-center gap-2"><ArrowUpDown className="h-3.5 w-3.5" /> Ver Historial</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            );
-        },
-    },
-];
-
-export function ClientTable({ onSelectClient }: { onSelectClient: (id: string) => void }) {
+export function ClientList({ onSelectClient }: { onSelectClient: (id: string) => void }) {
     const [data, setData] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [sorting, setSorting] = useState<SortingState>([]);
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [globalFilter, setGlobalFilter] = useState("");
+    const [pipelines, setPipelines] = useState<any[]>([]);
 
     const fetchClients = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from("clients")
-            .select("*")
-            .order("created_at", { ascending: false });
-
-        if (!error) {
-            setData(data || []);
+        try {
+            setLoading(true);
+            const { data: clients } = await supabase
+                .from("clients")
+                .select("*")
+                .order("created_at", { ascending: false });
+            
+            const { data: pData } = await supabase.from("pipelines").select("*");
+            
+            setData(clients || []);
+            setPipelines(pData || []);
+        } catch (error) {
+            console.error("Error fetching clients:", error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
         fetchClients();
-
-        const channel = supabase
-            .channel("list_changes")
-            .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => {
-                fetchClients();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
     }, []);
+
+    const columns = useMemo<ColumnDef<Client>[]>(() => [
+        {
+            accessorKey: "name",
+            header: "Nombre",
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <span className="text-[13px] font-semibold text-text-main leading-none mb-1">{row.original.name}</span>
+                    <span className="text-[11px] text-text-placeholder font-medium">{row.original.email || row.original.phone}</span>
+                </div>
+            )
+        },
+        {
+            accessorKey: "service",
+            header: "Servicio",
+            cell: ({ row }) => (
+                <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-tight">
+                    {row.original.service || "—"}
+                </span>
+            )
+        },
+        {
+            accessorKey: "status",
+            header: "Pipeline",
+            cell: ({ row }) => {
+                const statusName = normalizeStatus(row.original.status);
+                const pipeline = pipelines.find(p => (p.name === statusName || p.id === statusName || p.id === row.original.status));
+                return (
+                    <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: pipeline?.color || "#EA580C" }} />
+                        <span className="text-[12px] font-medium text-text-secondary">{statusName}</span>
+                    </div>
+                );
+            }
+        },
+        {
+            accessorKey: "lead_source",
+            header: "Lead Source",
+            cell: ({ row }) => (
+                <span className="text-[10px] font-semibold text-text-placeholder uppercase">
+                    {row.original.lead_source || "—"}
+                </span>
+            )
+        },
+        {
+            accessorKey: "estimated_budget",
+            header: "Presupuesto",
+            cell: ({ row }) => (
+                <span className="text-[10.5px] font-semibold text-text-main">
+                    {row.original.estimated_budget || "—"}
+                </span>
+            )
+        },
+        {
+            accessorKey: "last_contact_at",
+            header: "Inactividad",
+            cell: ({ row }) => <InactivityBadge lastContactAt={row.original.last_contact_at} />
+        },
+        {
+            accessorKey: "created_at",
+            header: "Fecha",
+            cell: ({ row }) => (
+                <span className="text-[11px] text-text-placeholder font-medium">
+                    {row.original.created_at ? (() => {
+                        try {
+                            return format(new Date(row.original.created_at), "dd MMM yyyy", { locale: es });
+                        } catch (e) {
+                            return String(row.original.created_at).slice(0,10);
+                        }
+                    })() : "—"}
+                </span>
+            )
+        }
+    ], [pipelines]);
 
     const table = useReactTable({
         data,
@@ -201,51 +158,54 @@ export function ClientTable({ onSelectClient }: { onSelectClient: (id: string) =
         getPaginationRowModel: getPaginationRowModel(),
         onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
-        onColumnFiltersChange: setColumnFilters,
         getFilteredRowModel: getFilteredRowModel(),
         state: {
             sorting,
-            columnFilters,
+            globalFilter,
+        },
+        initialState: {
+            pagination: {
+                pageSize: 20,
+            },
         },
     });
 
     if (loading && data.length === 0) {
         return (
             <div className="flex items-center justify-center p-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-orange-primary" />
             </div>
         );
     }
 
     return (
-        <div>
-            <div className="flex items-center py-4">
-                <Input
-                    placeholder="Filtrar por nombre..."
-                    value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-                    onChange={(event) =>
-                        table.getColumn("name")?.setFilterValue(event.target.value)
-                    }
-                    className="max-w-sm rounded-xl"
-                />
+        <div className="flex flex-col h-full bg-white">
+            <div className="p-4 border-b border-border-primary flex items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-sm group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-placeholder group-focus-within:text-orange-primary transition-colors" />
+                    <Input
+                        placeholder="Buscar cliente..."
+                        value={globalFilter}
+                        onChange={(e) => setGlobalFilter(e.target.value)}
+                        className="h-9 pl-9 bg-background border-border-primary rounded-xl text-[11px] focus-visible:ring-orange-primary/20"
+                    />
+                </div>
+                
+                <Button variant="outline" size="sm" className="h-9 border-border-primary rounded-xl text-[11px] font-semibold gap-2">
+                    <Filter className="h-3.5 w-3.5" /> Filtros
+                </Button>
             </div>
-            <div className="rounded-2xl border overflow-hidden shadow-sm bg-white">
+
+            <div className="flex-1 overflow-auto">
                 <Table>
-                    <TableHeader className="bg-slate-50/50">
+                    <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => {
-                                    return (
-                                        <TableHead key={header.id} className="font-bold text-slate-500 uppercase text-[10px] tracking-wider">
-                                            {header.isPlaceholder
-                                                ? null
-                                                : flexRender(
-                                                    header.column.columnDef.header,
-                                                    header.getContext()
-                                                )}
-                                        </TableHead>
-                                    );
-                                })}
+                            <TableRow key={headerGroup.id} className="hover:bg-transparent border-b border-border-primary">
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id} className="h-10 text-[9.5px] font-bold text-text-placeholder uppercase tracking-wider px-4">
+                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                    </TableHead>
+                                ))}
                             </TableRow>
                         ))}
                     </TableHeader>
@@ -254,12 +214,11 @@ export function ClientTable({ onSelectClient }: { onSelectClient: (id: string) =
                             table.getRowModel().rows.map((row) => (
                                 <TableRow
                                     key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
                                     onClick={() => onSelectClient(row.original.id)}
-                                    className="cursor-pointer hover:bg-slate-50 transition-colors"
+                                    className="group cursor-pointer hover:bg-orange-light/30 border-b border-border-primary/50 transition-colors"
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className="py-4">
+                                        <TableCell key={cell.id} className="py-3 px-4">
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
@@ -267,33 +226,42 @@ export function ClientTable({ onSelectClient }: { onSelectClient: (id: string) =
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    No se encontraron resultados.
+                                <TableCell colSpan={columns.length} className="h-32 text-center text-[11px] text-text-placeholder">
+                                    No se encontraron clientes.
                                 </TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                 </Table>
             </div>
-            <div className="flex items-center justify-end space-x-2 py-4">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                >
-                    Anterior
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                >
-                    Siguiente
-                </Button>
+
+            <div className="p-4 border-t border-border-primary flex items-center justify-between shrink-0">
+                <p className="text-[10px] font-medium text-text-placeholder uppercase tracking-wider">
+                    Mostrando {table.getRowModel().rows.length} de {data.length} clientes
+                </p>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                        className="h-8 w-8 p-0 rounded-lg border-border-primary"
+                    >
+                        <ChevronLeft className="h-4 w-4 text-text-secondary" />
+                    </Button>
+                    <div className="text-[11px] font-bold text-text-main px-2">
+                        {table.getState().pagination.pageIndex + 1}
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                        className="h-8 w-8 p-0 rounded-lg border-border-primary"
+                    >
+                        <ChevronRight className="h-4 w-4 text-text-secondary" />
+                    </Button>
+                </div>
             </div>
         </div>
     );

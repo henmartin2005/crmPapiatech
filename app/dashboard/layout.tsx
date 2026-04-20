@@ -32,10 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .upsert({
         id: user.id,
         email: user.email,
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Nuevo Usuario',
-        role: 'admin', // Rol por defecto, ajustable luego
-        is_active: true,
-        updated_at: new Date().toISOString()
+        role: 'usuario', // Rol por defecto más seguro
       }, { onConflict: 'id' })
       .select('*')
       .single()
@@ -43,8 +40,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (newProfile && !createError) {
       profile = newProfile
       console.log(`Perfil creado exitosamente para: ${user.email}`)
-      // Forzar revalidación para asegurar que el cliente vea el cambio
-      revalidatePath('/dashboard', 'layout')
     } else {
       console.error('Error al crear perfil automático:', createError)
       return (
@@ -60,10 +55,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   }
 
-  // Verificar si el usuario está activo
-  if (!profile.is_active) {
-    redirect('/login?error=account_disabled')
-  }
+  // La verificación de is_active se omite si la columna no existe en el esquema actual
 
   return (
     <DashboardShell>

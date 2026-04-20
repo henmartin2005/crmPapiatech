@@ -1,35 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
     LayoutDashboard,
     Users,
     Calendar,
     Briefcase,
-    BarChart,
-    Workflow,
+    Mail,
     Settings,
-    LogOut,
     UserCog,
     ClipboardList,
     PanelLeftClose,
     PanelLeft,
+    ChevronLeft,
+    ChevronRight,
+    Star
 } from "lucide-react";
-import { UserMenu } from "@/components/UserMenu";
+import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
 
-const sidebarItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
-    { href: "/dashboard/clients", icon: Users, label: "Clients" },
-    { href: "/dashboard/appointments", icon: Calendar, label: "Appointments" },
+const PRINCIPAL_ITEMS = [
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/dashboard/clients", icon: Users, label: "Clients", badgeColor: "bg-orange-primary" },
+    { href: "/dashboard/tasks", icon: ClipboardList, label: "Tasks", badgeColor: "bg-red-500" },
+    { href: "/dashboard/appointments", icon: Calendar, label: "Appointments", badgeColor: "bg-amber-500" },
+];
+
+const GESTION_ITEMS = [
+    { href: "/dashboard/email", icon: Mail, label: "Email" },
     { href: "/dashboard/services", icon: Briefcase, label: "Services" },
-    { href: "/dashboard/traffic", icon: BarChart, label: "Traffic" },
-    { href: "/dashboard/automations", icon: Workflow, label: "Automations" },
-    { href: "/dashboard/tasks", icon: ClipboardList, label: "Tasks" },
     { href: "/dashboard/users", icon: UserCog, label: "Users" },
     { href: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
@@ -41,109 +44,149 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const pathname = usePathname();
-    const router = useRouter();
-    const [pendingTaskCount, setPendingTaskCount] = useState(0);
+    const { user, profile, isSuperAdmin } = useAuth();
+    const [counts, setCounts] = useState({ tasks: 0, appointments: 0, clients: 0 });
 
-    // Fetch pending task count
     useEffect(() => {
-        const fetchPendingCount = async () => {
-            const { data } = await supabase
-                .from("client_tasks")
-                .select("due_date")
-                .eq("status", "pending")
-                .gte("due_date", new Date().toISOString());
-            setPendingTaskCount(data?.length || 0);
+        const fetchCounts = async () => {
+            const { count: tasks } = await supabase.from("tasks").select("*", { count: "exact", head: true }).eq("status", "pending");
+            const { count: appointments } = await supabase.from("appointments").select("*", { count: "exact", head: true }).eq("status", "pending");
+            const { count: clients } = await supabase.from("clients").select("*", { count: "exact", head: true });
+            setCounts({ tasks: tasks || 0, appointments: appointments || 0, clients: clients || 0 });
         };
-        fetchPendingCount();
-        // Refresh every 30 seconds
-        const interval = setInterval(fetchPendingCount, 30000);
-        return () => clearInterval(interval);
+        fetchCounts();
     }, []);
 
+    const NavItem = ({ item }: { item: any }) => {
+        const Icon = item.icon;
+        const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+        
+        // Get badge count
+        let count = 0;
+        if (item.label === "Tasks") count = counts.tasks;
+        if (item.label === "Appointments") count = counts.appointments;
+        if (item.label === "Clients") count = counts.clients;
+
+        return (
+            <Link 
+                href={item.href}
+                className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative",
+                    isActive 
+                        ? "bg-orange-light text-orange-primary font-medium" 
+                        : "text-text-secondary hover:bg-orange-light hover:text-orange-primary",
+                    collapsed && "justify-center px-0"
+                )}
+            >
+                <Icon className={cn("h-4 w-4 shrink-0 transition-transform", !isActive && "group-hover:scale-110")} />
+                {!collapsed && (
+                    <span className="text-[13px] font-medium truncate flex-1 uppercase tracking-tight">
+                        {item.label}
+                    </span>
+                )}
+                
+                {count > 0 && item.badgeColor && (
+                    <span className={cn(
+                        "flex items-center justify-center rounded-full text-white text-[10px] font-black min-w-[17px] h-4.5 px-1",
+                        item.badgeColor,
+                        collapsed ? "absolute -top-1 -right-1" : "ml-auto"
+                    )}>
+                        {count > 99 ? "99+" : count}
+                    </span>
+                )}
+            </Link>
+        );
+    };
 
     return (
-        <div
-            className={cn(
-                "flex flex-col h-full border-r bg-muted/10 p-4 space-y-4 transition-all duration-300 ease-in-out shrink-0",
-                collapsed ? "w-[72px]" : "w-64"
-            )}
-        >
-            {/* Logo + Toggle */}
-            <div className={cn("flex items-center shrink-0", collapsed ? "flex-col gap-2" : "flex-col")}>
-                {!collapsed && (
-                    <div className="flex flex-col items-center pt-0 pb-0 px-2 mb-0">
-                        <img
-                            src="/logo-papia.png"
-                            alt="Papia Technology Solutions"
-                            className="h-48 w-auto object-contain mix-blend-multiply brightness-90 contrast-125 transition-all"
-                        />
+        <div className={cn(
+            "h-full border-r border-border-primary bg-white flex flex-col transition-all duration-200 ease-in-out shrink-0 z-30",
+            collapsed ? "w-[50px]" : "w-[196px]"
+        )}>
+            {/* Header / Logo */}
+            <div className="h-12 border-b border-border-primary flex items-center px-3 justify-between shrink-0">
+                <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="h-[26px] w-[26px] bg-orange-primary rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                        <Star className="h-3.5 w-3.5 text-white fill-white" />
                     </div>
+                    {!collapsed && (
+                        <div className="flex flex-col">
+                            <span className="text-[14px] font-bold text-text-main leading-tight tracking-tight">Papiatech</span>
+                            <span className="text-[10px] text-text-placeholder leading-none font-semibold">CRM v2</span>
+                        </div>
+                    )}
+                </div>
+                {!collapsed && (
+                    <button 
+                        onClick={onToggle}
+                        className="h-6 w-6 rounded-md bg-[#f5f2ee] flex items-center justify-center text-text-muted hover:text-orange-primary transition-colors"
+                    >
+                        <PanelLeftClose className="h-3.5 w-3.5" />
+                    </button>
                 )}
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={onToggle}
-                    className={cn(
-                        "text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-all rounded-xl",
-                        collapsed ? "h-10 w-10 p-0 mx-auto" : "h-8 self-end -mt-2 mb-1"
-                    )}
-                    title={collapsed ? "Expandir menú" : "Colapsar menú"}
-                >
-                    {collapsed ? (
-                        <PanelLeft className="h-4 w-4" />
-                    ) : (
-                        <PanelLeftClose className="h-4 w-4" />
-                    )}
-                </Button>
+                {collapsed && (
+                    <button 
+                        onClick={onToggle}
+                        className="absolute -right-3 top-10 h-6 w-6 rounded-full bg-white border border-border-primary flex items-center justify-center text-text-muted hover:text-orange-primary shadow-sm z-50"
+                    >
+                        <ChevronRight className="h-3 w-3" />
+                    </button>
+                )}
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 space-y-1">
-                {sidebarItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                    const isTaskItem = item.href === "/dashboard/tasks";
-                    const showBadge = isTaskItem && pendingTaskCount > 0;
+            <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-6">
+                <div>
+                    {!collapsed && (
+                        <h3 className="px-3 mb-2 text-[11px] font-black text-text-placeholder uppercase tracking-widest">Principal</h3>
+                    )}
+                    <div className="space-y-0.5">
+                        {PRINCIPAL_ITEMS.map(item => <NavItem key={item.href} item={item} />)}
+                    </div>
+                </div>
 
-                    return (
-                        <Link key={item.href} href={item.href}>
-                            <Button
-                                type="button"
-                                variant={isActive ? "secondary" : "ghost"}
-                                className={cn(
-                                    "w-full transition-all relative",
-                                    collapsed ? "justify-center px-0" : "justify-start",
-                                    isActive && "bg-secondary text-primary font-medium"
-                                )}
-                                title={collapsed ? item.label : undefined}
-                            >
-                                <div className="relative">
-                                    <Icon className={cn("h-4 w-4 shrink-0", !collapsed && "mr-2")} />
-                                    {showBadge && collapsed && (
-                                        <span className="absolute -top-2 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-black px-1 shadow-sm animate-pulse">
-                                            {pendingTaskCount > 99 ? "99+" : pendingTaskCount}
-                                        </span>
-                                    )}
-                                </div>
-                                {!collapsed && (
-                                    <>
-                                        <span className="truncate flex-1 text-left">{item.label}</span>
-                                        {showBadge && (
-                                            <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-black px-1.5 shadow-sm ml-auto">
-                                                {pendingTaskCount > 99 ? "99+" : pendingTaskCount}
-                                            </span>
-                                        )}
-                                    </>
-                                )}
-                            </Button>
-                        </Link>
-                    );
-                })}
-            </nav>
+                <div>
+                    {!collapsed && (
+                        <h3 className="px-3 mb-2 text-[10px] font-bold text-text-placeholder uppercase tracking-widest">Gestión</h3>
+                    )}
+                    <div className="space-y-0.5">
+                        {GESTION_ITEMS.map(item => <NavItem key={item.href} item={item} />)}
+                    </div>
+                </div>
+            </div>
 
-            <div className="pt-4 border-t flex justify-center">
-                <UserMenu />
+            {/* Footer / Profile */}
+            <div className="p-2 border-t border-border-primary shrink-0 bg-slate-50/50">
+                <div className={cn(
+                    "flex items-center gap-2 p-1.5 rounded-xl transition-colors",
+                    collapsed ? "justify-center" : "bg-white border border-border-primary shadow-sm"
+                )}>
+                    <Avatar className={cn("h-7 w-7 border border-orange-light shrink-0", !collapsed && "shadow-sm")}>
+                        <AvatarImage src={profile?.avatar_url || ""} />
+                        <AvatarFallback className="bg-orange-light text-orange-primary text-[10px] font-black">
+                            {user?.email?.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                    </Avatar>
+                    
+                    {!collapsed && (
+                        <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-[12px] font-bold text-text-main truncate leading-tight">
+                                {profile?.full_name || "Usuario"}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                {isSuperAdmin ? (
+                                    <span className="text-[9px] font-bold text-orange-dark bg-orange-light px-1.5 py-0.5 rounded-md leading-none">
+                                        Super Admin
+                                    </span>
+                                ) : (
+                                    <span className="text-[9px] text-text-placeholder truncate leading-none">
+                                        {profile?.role || "Manager"}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

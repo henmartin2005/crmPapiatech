@@ -1,48 +1,47 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-    Mail,
-    Phone,
-    User,
-    Globe,
-    Tag,
-    Instagram,
-    Facebook,
-    MessageCircle,
+import { 
+    X, 
+    Mail, 
+    Phone, 
+    Globe, 
+    Tag, 
+    Briefcase, 
+    TrendingUp, 
+    Clock, 
+    MessageSquare,
+    CheckSquare,
+    CalendarPlus,
     Loader2,
-    Pencil,
+    ArrowRight,
+    MessageCircle,
+    Edit2,
     Save,
-    Briefcase,
-    TrendingUp,
-    Clock,
-    LayoutDashboard,
-    Activity as ActivityIcon
+    RotateCcw
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { supabase } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+import { Label } from "@/components/ui/label";
+import { updateClientAction } from "@/app/actions/leads";
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
 } from "@/components/ui/select";
 
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
-
-// New Components
+// Sub-components
 import { StageProgress } from "./StageProgress";
 import { ActivityFeed } from "./ActivityFeed";
 import { NoteSheet } from "./NoteSheet";
@@ -56,303 +55,268 @@ interface ClientDrawerProps {
 }
 
 export function ClientDrawer({ open, onOpenChange, clientId }: ClientDrawerProps) {
-    const router = useRouter();
     const [loading, setLoading] = useState(false);
-    
-    const [client, setClient] = useState({
-        id: "", 
-        name: "", 
-        email: "", 
-        phone: "", 
-        country: "",
-        source: "WhatsApp", 
-        service: "InfoWeb Plan", 
-        status: "NEW",
-        notes: "", 
-        auto_followup: false,
-        product_service: "",
-        social_media: "",
-        estimated_budget: "",
-        project_description: "",
-        project_value: null as number | null,
-    });
-
-    const [editing, setEditing] = useState(false);
-
-    const sourceIcons: Record<string, React.ReactNode> = {
-        WhatsApp: <MessageCircle className="h-3.5 w-3.5 text-green-500" />,
-        Instagram: <Instagram className="h-3.5 w-3.5 text-pink-500" />,
-        Facebook: <Facebook className="h-3.5 w-3.5 text-blue-600" />,
-        Other: <Tag className="h-3.5 w-3.5 text-slate-400" />,
-    };
-
-    const STATUS_COLORS: Record<string, { bg: string; label: string }> = {
-        NEW: { bg: "#3B82F6", label: "New Lead" },
-        CONTACTED: { bg: "#F59E0B", label: "Conversation" },
-        PROPOSAL_SENT: { bg: "#10B981", label: "Proposal" },
-        PAYMENT_INITIAL: { bg: "#8B5CF6", label: "Initial Payment" },
-        ACTIVE: { bg: "#EC4899", label: "Treatment" },
-        INACTIVE: { bg: "#6B7280", label: "Inactive" },
-    };
-
-    const statusInfo = STATUS_COLORS[client.status] || STATUS_COLORS.NEW;
+    const [client, setClient] = useState<any>(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [editForm, setEditForm] = useState<any>({});
 
     const fetchClient = useCallback(async (id: string) => {
         setLoading(true);
         const { data, error } = await supabase.from("clients").select("*").eq("id", id).single();
-        if (data && !error) setClient(data);
+        if (data && !error) {
+            setClient(data);
+            setEditForm(data);
+        }
         setLoading(false);
     }, []);
 
-    useEffect(() => {
-        if (!open) { setEditing(false); return; }
-        if (clientId) {
-            fetchClient(clientId);
-            setEditing(false);
-        } else {
-            setClient({ 
-                id: "", name: "", email: "", phone: "", country: "", source: "WhatsApp", service: "InfoWeb Plan", status: "NEW", notes: "", auto_followup: false,
-                product_service: "", social_media: "", estimated_budget: "", project_description: "", project_value: null
+    const handleSave = async () => {
+        if (!clientId) return;
+        setSaving(true);
+        try {
+            const numericBudget = Number(String(editForm.estimated_budget || "").replace(/[^0-9.]/g, "")) || 0;
+            const result = await updateClientAction(clientId, {
+                ...editForm,
+                project_value: numericBudget
             });
-            setEditing(true);
+            if (result.success) {
+                setClient(editForm);
+                setIsEditing(false);
+            } else {
+                alert(result.error);
+            }
+        } catch (err) {
+            console.error("Save Error:", err);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    useEffect(() => {
+        if (open && clientId) {
+            fetchClient(clientId);
+        } else {
+            setClient(null);
+            setIsEditing(false);
         }
     }, [open, clientId, fetchClient]);
 
-    const handleSave = async () => {
-        if (!client.name) return;
-        setLoading(true);
-        const { error } = await supabase.from("clients").upsert({
-            ...(client.id ? { id: client.id } : {}),
-            name: client.name, 
-            email: client.email, 
-            phone: client.phone,
-            country: client.country, 
-            source: client.source, 
-            service: client.service,
-            notes: client.notes, 
-            auto_followup: client.auto_followup,
-            status: client.status || "NEW",
-            product_service: client.product_service,
-            social_media: client.social_media,
-            estimated_budget: client.estimated_budget,
-            project_description: client.project_description,
-            project_value: client.project_value,
-            updated_at: new Date().toISOString(),
-        });
-        setLoading(false);
-        if (!error) { 
-            setEditing(false); 
-            if (!clientId) { onOpenChange(false); router.refresh(); }
-            else { fetchClient(clientId); router.refresh(); }
-        }
-        else alert("Error: " + error.message);
-    };
-
-    const InfoRow = ({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string | React.ReactNode; color?: string }) => (
-        <div className="flex items-center gap-4 py-3 px-1 border-b border-slate-50 last:border-0 group">
-            <div className={cn("shrink-0 p-2 rounded-xl bg-slate-50 transition-colors group-hover:bg-white group-hover:shadow-sm", color || "text-slate-400")}>
-                {icon}
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mb-0.5">{label}</p>
-                <div className="text-sm font-bold text-slate-700 truncate">{value || "—"}</div>
-            </div>
-        </div>
-    );
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[1400px] w-[92vw] max-h-[95vh] overflow-hidden rounded-[2.5rem] border border-slate-100 shadow-[0_32px_128px_rgba(0,0,0,0.15)] p-0 bg-white [&>button]:hidden flex flex-col">
-                {/* Header Section */}
-                <div className="px-10 py-8 text-white flex items-center justify-between shrink-0 relative overflow-hidden" style={{ backgroundColor: statusInfo.bg }}>
-                    {/* Decorative gloss */}
-                    <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
-                    
-                    <DialogHeader className="flex-1 z-10">
-                        <div className="flex items-center gap-6">
-                            <Avatar className="h-20 w-20 border-[4px] border-white/30 shadow-2xl scale-110">
-                                <AvatarFallback className="bg-white/20 text-white text-3xl font-black">
-                                    {client.name?.charAt(0)?.toUpperCase() || "C"}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="space-y-1">
-                                <DialogTitle className="text-3xl font-black tracking-tight flex items-center gap-4">
-                                    {client.name || "New Lead"}
-                                    <div className="px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-widest border border-white/20 shadow-sm">
-                                        {statusInfo.label}
-                                    </div>
-                                </DialogTitle>
-                                <div className="flex items-center gap-6 text-white/80 text-sm font-bold">
-                                    {client.phone && <span className="flex items-center gap-2">📞 {client.phone}</span>}
-                                    {client.email && <span className="flex items-center gap-2">✉️ {client.email}</span>}
-                                    {client.country && <span className="flex items-center gap-2">📍 {client.country}</span>}
-                                </div>
+            <DialogContent className="max-w-[1100px] w-[95vw] h-[85vh] p-0 overflow-hidden border-none rounded-[22px] shadow-2xl bg-white focus:outline-none">
+                <div className="flex h-full">
+                    {/* LEFT COLUMN: CLIENT INFO (40%) */}
+                    <div className="w-[400px] border-r border-border-primary bg-[#fafaf9] flex flex-col shrink-0 overflow-y-auto">
+                        {loading ? (
+                            <div className="flex-1 flex items-center justify-center">
+                                <Loader2 className="h-6 w-6 animate-spin text-orange-primary" />
                             </div>
-                        </div>
-                    </DialogHeader>
-                    
-                    <div className="flex items-center gap-4 z-10">
-                        {clientId && !editing && (
-                            <Button 
-                                onClick={() => setEditing(true)} 
-                                variant="outline" 
-                                className="bg-white/10 border-white/20 text-white hover:bg-white hover:text-slate-900 rounded-2xl font-black text-xs uppercase px-6 h-12 transition-all shadow-lg"
-                            >
-                                <Pencil className="mr-2 h-4 w-4" /> Edit Profile
-                            </Button>
-                        )}
-                        <button onClick={() => onOpenChange(false)} className="h-12 w-12 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all flex items-center justify-center text-white/70 hover:text-white border border-white/10">
-                            <X className="h-6 w-6" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex flex-1 overflow-hidden bg-slate-50/30">
-                    {/* ======= LEFT COLUMN: Data ======= */}
-                    <div className="w-[380px] shrink-0 border-r border-slate-100 flex flex-col bg-white overflow-y-auto">
-                        
-                        {/* Section: MAIN INFO */}
-                        <div className="px-8 py-8 space-y-8">
-                            <div>
-                                <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-purple-600 mb-6 flex items-center gap-2">
-                                    <User className="h-4 w-4" /> Client Information
-                                </h3>
-                                
-                                {!editing ? (
-                                    <div className="bg-slate-50/50 rounded-[2rem] p-4 border border-slate-100">
-                                        <InfoRow icon={<User className="h-4 w-4" />} label="Full Name" value={client.name} color="text-slate-600" />
-                                        <InfoRow icon={<Phone className="h-4 w-4" />} label="Phone" value={client.phone} color="text-green-600" />
-                                        <InfoRow icon={<Mail className="h-4 w-4" />} label="Email" value={client.email} color="text-blue-600" />
-                                        <InfoRow icon={<LayoutDashboard className="h-4 w-4" />} label="Source" value={<div className="flex items-center gap-2">{sourceIcons[client.source]} {client.source}</div>} color="text-orange-600" />
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Full Name</Label><Input value={client.name} onChange={(e) => setClient({ ...client, name: e.target.value })} className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4 focus-visible:ring-purple-200" /></div>
-                                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Phone</Label><Input value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4 focus-visible:ring-purple-200" /></div>
-                                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Email</Label><Input value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4 focus-visible:ring-purple-200" /></div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Lead Source</Label>
-                                            <Select value={client.source} onValueChange={(val) => setClient({ ...client, source: val })}>
-                                                <SelectTrigger className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4 focus:ring-purple-200"><div className="flex items-center gap-2">{sourceIcons[client.source]}<SelectValue /></div></SelectTrigger>
-                                                <SelectContent className="rounded-2xl border-none shadow-2xl"><SelectItem value="WhatsApp">WhatsApp</SelectItem><SelectItem value="Instagram">Instagram</SelectItem><SelectItem value="Facebook">Facebook</SelectItem><SelectItem value="Other">Otro</SelectItem></SelectContent>
-                                            </Select>
+                        ) : client ? (
+                            <div className="flex flex-col h-full">
+                                {/* Header */}
+                                <div className="p-8 pb-4">
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <Avatar className="h-14 w-14 border-2 border-white shadow-sm ring-1 ring-orange-light">
+                                            <AvatarFallback className="bg-orange-light text-orange-primary font-black text-xl">
+                                                {client.name?.charAt(0).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col min-w-0">
+                                            <DialogTitle className="text-[20px] font-bold text-text-main truncate leading-tight">
+                                                {client.name}
+                                            </DialogTitle>
+                                            <span className="text-[11px] font-bold text-orange-primary bg-orange-light px-2.5 py-1 rounded-md self-start mt-1.5 uppercase tracking-wider">
+                                                {client.status}
+                                            </span>
                                         </div>
                                     </div>
-                                )}
-                            </div>
-
-                            {/* Section: PROJECT DETAILS (From Web Form) */}
-                            <div>
-                                <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 mb-6 flex items-center gap-2">
-                                    <Briefcase className="h-4 w-4" /> Project Details
-                                </h3>
-                                
-                                {!editing ? (
-                                    <div className="bg-slate-50/50 rounded-[2rem] p-4 border border-slate-100">
-                                        <InfoRow icon={<Briefcase className="h-4 w-4" />} label="Service Interested" value={client.service} color="text-blue-600" />
-                                        <InfoRow icon={<TrendingUp className="h-4 w-4" />} label="Product/Service sold" value={client.product_service} color="text-emerald-600" />
-                                        <InfoRow icon={<Instagram className="h-4 w-4" />} label="Social Media" value={client.social_media} color="text-pink-600" />
-                                        <InfoRow icon={<span className="font-black text-xs">$</span>} label="Estimated Budget" value={client.estimated_budget} color="text-amber-600" />
+                                    
+                                    <div className="grid grid-cols-2 gap-3 mt-8">
+                                        <button 
+                                            onClick={() => setIsEditing(!isEditing)}
+                                            className={cn(
+                                                "flex items-center justify-center gap-2 py-3 rounded-2xl text-[12px] font-bold transition-all shadow-sm",
+                                                isEditing ? "bg-slate-100 text-slate-600" : "bg-white border border-border-primary text-text-secondary hover:bg-orange-light hover:text-orange-primary"
+                                            )}
+                                        >
+                                            {isEditing ? <RotateCcw className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
+                                            {isEditing ? "Cancelar" : "Editar Perfil"}
+                                        </button>
                                         
-                                        {client.project_description && (
-                                            <div className="py-4 px-2">
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Requirement Description</p>
-                                                <div className="text-sm font-medium text-slate-600 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm leading-relaxed lowercase first-letter:uppercase">
-                                                    {client.project_description}
-                                                </div>
-                                            </div>
+                                        {isEditing ? (
+                                            <button 
+                                                onClick={handleSave}
+                                                disabled={saving}
+                                                className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-orange-primary text-white text-[12px] font-black shadow-lg hover:shadow-orange-primary/20 transition-all disabled:opacity-50"
+                                            >
+                                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                                Guardar
+                                            </button>
+                                        ) : (
+                                            <QuickAction icon={Phone} label="Llamar" color="text-green-600 bg-green-50/50 border border-green-100" />
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Service Interest</Label>
-                                            <Select value={client.service} onValueChange={(val) => setClient({ ...client, service: val })}>
-                                                <SelectTrigger className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4 focus:ring-purple-200"><SelectValue /></SelectTrigger>
-                                                <SelectContent className="rounded-2xl shadow-2xl">
-                                                    <SelectItem value="InfoWeb Plan">InfoWeb Plan</SelectItem><SelectItem value="Starter Plan">Starter Plan</SelectItem>
-                                                    <SelectItem value="Chat AI Agent">Chat AI Agent</SelectItem><SelectItem value="Sistema de Citas">Sistema de Citas</SelectItem>
-                                                    <SelectItem value="CRM Customizado">CRM Customizado</SelectItem><SelectItem value="Refresh Plan">Refresh Plan</SelectItem>
-                                                    <SelectItem value="Mantenimiento + Ads">Mantenimiento + Ads</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                </div>
+
+                                {/* Content Sections */}
+                                <div className="p-8 pt-4 space-y-8 pb-20">
+                                    {/* Contact Section */}
+                                    <div>
+                                        <h3 className="text-[11px] font-black text-text-placeholder uppercase tracking-[0.15em] mb-5 flex items-center gap-2">
+                                            <Tag className="h-3.5 w-3.5" /> Información de Contacto
+                                        </h3>
+                                        <div className="space-y-6">
+                                            {isEditing ? (
+                                                <div className="space-y-5 animate-in fade-in slide-in-from-top-2">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-bold text-text-placeholder uppercase ml-1">Nombre Completo</Label>
+                                                        <Input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="h-12 text-[14px] rounded-xl border-border-primary" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-bold text-text-placeholder uppercase ml-1">Teléfono</Label>
+                                                        <Input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="h-12 text-[14px] rounded-xl border-border-primary" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-bold text-text-placeholder uppercase ml-1">Email</Label>
+                                                        <Input value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} className="h-12 text-[14px] rounded-xl border-border-primary" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-bold text-text-placeholder uppercase ml-1">Fuente</Label>
+                                                        <Select value={editForm.source} onValueChange={val => setEditForm({...editForm, source: val})}>
+                                                            <SelectTrigger className="h-12 text-[14px] rounded-xl border-border-primary">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="Instagram">Instagram</SelectItem>
+                                                                <SelectItem value="Facebook">Facebook</SelectItem>
+                                                                <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                                                                <SelectItem value="Website Form">Website Form</SelectItem>
+                                                                <SelectItem value="Directo">Directo</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-5">
+                                                    <InfoItem icon={Phone} label="Teléfono" value={client.phone || "—"} />
+                                                    <InfoItem icon={Mail} label="Email" value={client.email || "—"} />
+                                                    <InfoItem icon={Globe} label="País" value={client.country || "—"} />
+                                                    <InfoItem icon={MessageCircle} label="Fuente de Lead" value={client.source || client.lead_source || "Directo"} />
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">What do they sell?</Label><Input value={client.product_service} onChange={(e) => setClient({ ...client, product_service: e.target.value })} className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4 placeholder:font-medium" placeholder="E.g. Shoes, Legal services..." /></div>
-                                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Social Media Handle</Label><Input value={client.social_media} onChange={(e) => setClient({ ...client, social_media: e.target.value })} className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4" placeholder="@user or url" /></div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Budget Range</Label>
-                                            <Select value={client.estimated_budget} onValueChange={(val) => setClient({ ...client, estimated_budget: val })}>
-                                                <SelectTrigger className="h-12 bg-slate-50 border-transparent rounded-2xl font-bold px-4"><SelectValue placeholder="Select budget..." /></SelectTrigger>
-                                                <SelectContent className="rounded-2xl shadow-2xl">
-                                                    <SelectItem value="< $500">&lt; $500</SelectItem>
-                                                    <SelectItem value="$500 - $1,000">$500 - $1,000</SelectItem>
-                                                    <SelectItem value="$1,000 - $3,000">$1,000 - $3,000</SelectItem>
-                                                    <SelectItem value="$3,000+">$3,000+</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Full Requirement</Label><Textarea value={client.project_description} onChange={(e) => setClient({ ...client, project_description: e.target.value })} className="min-h-[120px] bg-slate-50 border-transparent rounded-2xl font-medium p-4 resize-none" placeholder="Details about the project..." /></div>
-                                        
-                                        <Button onClick={handleSave} disabled={loading || !client.name}
-                                            className="w-full h-14 rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-black text-lg shadow-xl shadow-purple-100 hover:scale-[1.02] transition-all disabled:opacity-50 mt-4">
-                                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save Profile"}
-                                        </Button>
                                     </div>
-                                )}
+
+                                    {/* Project Section */}
+                                    <div className="bg-white border border-border-primary rounded-2xl p-6 shadow-sm space-y-6">
+                                        <h3 className="text-[11px] font-black text-text-placeholder uppercase tracking-[0.15em] flex items-center gap-2">
+                                            <Briefcase className="h-4 w-4" /> Detalles del Proyecto
+                                        </h3>
+                                        <div className="space-y-6">
+                                            {isEditing ? (
+                                                <div className="space-y-5 animate-in fade-in slide-in-from-top-2">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-bold text-text-placeholder uppercase ml-1">Servicio</Label>
+                                                        <Input value={editForm.service} onChange={e => setEditForm({...editForm, service: e.target.value})} className="h-12 text-[14px] rounded-xl border-border-primary" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-bold text-text-placeholder uppercase ml-1">Presupuesto ($)</Label>
+                                                        <Input value={editForm.estimated_budget} onChange={e => setEditForm({...editForm, estimated_budget: e.target.value})} className="h-12 text-[14px] rounded-xl border-border-primary" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-[11px] font-bold text-text-placeholder uppercase ml-1">Descripción</Label>
+                                                        <textarea 
+                                                            value={editForm.project_description || ""} 
+                                                            onChange={e => setEditForm({...editForm, project_description: e.target.value})}
+                                                            className="w-full min-h-[100px] p-4 text-[14px] rounded-xl border border-border-primary focus:ring-2 focus:ring-orange-primary/20 focus:outline-none transition-all resize-none"
+                                                            placeholder="Detalles sobre el proyecto..."
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex justify-between items-end">
+                                                        <div className="space-y-1.5">
+                                                            <p className="text-[11px] text-text-placeholder font-black uppercase tracking-wider">Servicio Interesado</p>
+                                                            <p className="text-[15px] font-bold text-text-main">{client.service || "—"}</p>
+                                                        </div>
+                                                        <div className="text-right space-y-1.5">
+                                                            <p className="text-[11px] text-text-placeholder font-black uppercase tracking-wider">Presupuesto</p>
+                                                            <p className="text-[16px] font-black text-orange-primary">{client.estimated_budget || "—"}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {client.project_description && (
+                                                        <div className="pt-4 border-t border-border-primary/50">
+                                                            <p className="text-[11px] text-text-placeholder font-black uppercase tracking-wider mb-2">Descripción</p>
+                                                            <p className="text-[13px] text-text-secondary leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-border-primary/50 italic">
+                                                                "{client.project_description}"
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Pipeline Section */}
+                                    <div>
+                                        <h3 className="text-[11px] font-black text-text-placeholder uppercase tracking-[0.15em] mb-5 flex items-center gap-2">
+                                            <TrendingUp className="h-4 w-4" /> Pipeline Progress
+                                        </h3>
+                                        <StageProgress 
+                                            clientId={client.id} 
+                                            currentStage={client.status} 
+                                            onStageChange={(newStage) => setClient({ ...client, status: newStage })} 
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        ) : null}
                     </div>
 
-                    {/* ======= MIDDLE COLUMN: Pipeline ======= */}
-                    <div className="w-[280px] shrink-0 border-r border-slate-100 flex flex-col bg-slate-50/20 px-8 py-8">
-                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-6 flex items-center gap-2">
-                            <ArrowRightLeft className="h-4 w-4" /> Pipeline
-                        </h3>
-                        
-                        <StageProgress 
-                            clientId={client.id} 
-                            currentStage={client.status} 
-                            onStageChange={(newStage) => setClient(prev => ({ ...prev, status: newStage }))} 
-                        />
-
-                        <div className="mt-auto bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Next Steps</p>
-                            <div className="space-y-2">
-                                <TaskDialog clientId={client.id} clientName={client.name} trigger={
-                                    <Button className="w-full h-11 rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-none font-bold text-xs gap-2">
-                                        <CheckSquare className="h-4 w-4" /> Add Task
-                                    </Button>
-                                } />
-                                <AppointmentDialog clientId={client.id} clientName={client.name} trigger={
-                                    <Button className="w-full h-11 rounded-2xl bg-orange-50 text-orange-600 hover:bg-orange-100 border-none font-bold text-xs gap-2">
-                                        <CalendarPlus className="h-4 w-4" /> Schedule Call
-                                    </Button>
-                                } />
+                    {/* RIGHT COLUMN: ACTIVITY FEED (60%) */}
+                    <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
+                        {/* Header actions */}
+                        <div className="p-6 border-b border-border-primary flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-6">
+                                <h3 className="text-[11px] font-black text-text-placeholder uppercase tracking-[0.15em] flex items-center gap-2">
+                                    <Clock className="h-4 w-4" /> Historial de Actividad
+                                </h3>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* ======= RIGHT COLUMN: Feed ======= */}
-                    <div className="flex-1 flex flex-col min-w-0 bg-white">
-                        <div className="px-10 py-6 border-b border-slate-50 shrink-0 flex items-center justify-between">
-                            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-purple-600 flex items-center gap-2">
-                                <ActivityIcon className="h-4 w-4" /> Activity Feed
-                            </h3>
                             
-                            <NoteSheet clientId={client.id} trigger={
-                                <Button className="h-10 px-6 rounded-2xl bg-purple-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-purple-700 shadow-lg shadow-purple-100 transition-all">
-                                    Quick Note
-                                </Button>
-                            } />
+                            <div className="flex items-center gap-2">
+                                <NoteSheet clientId={clientId!} trigger={
+                                    <Button className="h-9 px-5 rounded-xl bg-orange-primary text-white text-[11px] font-bold hover:bg-orange-dark shadow-md transition-all">
+                                        + Nota
+                                    </Button>
+                                } />
+                                <TaskDialog clientId={clientId!} clientName={client?.name} trigger={
+                                    <Button variant="outline" className="h-9 px-5 rounded-xl border-border-primary text-text-secondary text-[11px] font-bold hover:bg-orange-light hover:border-orange-primary/30 transition-all">
+                                        + Tarea
+                                    </Button>
+                                } />
+                                <AppointmentDialog clientId={clientId!} clientName={client?.name} trigger={
+                                    <Button variant="outline" className="h-9 px-5 rounded-xl border-border-primary text-text-secondary text-[11px] font-bold hover:bg-orange-light hover:border-orange-primary/30 transition-all">
+                                        + Cita
+                                    </Button>
+                                } />
+                            </div>
                         </div>
 
-                        {clientId ? (
-                            <ActivityFeed clientId={clientId} />
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center text-slate-300">
-                                <p className="font-bold uppercase tracking-widest text-xs">Save lead to start history</p>
-                            </div>
-                        )}
+                        {/* Feed */}
+                        <div className="flex-1 overflow-y-auto">
+                            {clientId && <ActivityFeed clientId={clientId} />}
+                        </div>
+                        
+                        {/* Close button inside dialog */}
+                        <button 
+                            onClick={() => onOpenChange(false)}
+                            className="absolute top-4 right-4 h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center text-text-placeholder hover:text-text-main transition-all z-50 hover:bg-slate-200"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
                     </div>
                 </div>
             </DialogContent>
@@ -360,6 +324,28 @@ export function ClientDrawer({ open, onOpenChange, clientId }: ClientDrawerProps
     );
 }
 
-const X = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-);
+function InfoItem({ icon: Icon, label, value }: { icon: any, label: string, value: string }) {
+    return (
+        <div className="flex items-start gap-4">
+            <div className="mt-1 p-2 bg-white rounded-lg border border-border-primary/50 shadow-sm">
+                <Icon className="h-4.5 w-4.5 text-text-placeholder" />
+            </div>
+            <div className="space-y-1 min-w-0">
+                <p className="text-[11px] text-text-placeholder font-black uppercase leading-none tracking-widest">{label}</p>
+                <p className="text-[15px] font-bold text-text-main truncate">{value}</p>
+            </div>
+        </div>
+    );
+}
+
+function QuickAction({ icon: Icon, label, color }: { icon: any, label: string, color: string }) {
+    return (
+        <button className={cn(
+            "flex flex-col items-center justify-center py-3 rounded-2xl gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] border shadow-sm",
+            color
+        )}>
+            <Icon className="h-4.5 w-4.5" />
+            <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+        </button>
+    );
+}

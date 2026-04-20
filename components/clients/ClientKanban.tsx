@@ -1,35 +1,18 @@
+"use client";
+
 import { useEffect, useState, useCallback } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-    Phone,
-    Mail,
-    Clock,
-    Loader2,
+import { 
+    Loader2, 
+    X,
+    MessageCircle,
     Instagram,
     Facebook,
-    MessageCircle,
-    Tag,
-    User,
-    MoreHorizontal,
-    MoveRight,
-    Trash2,
-    X
+    Tag
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { cn, getLightColor, getDarkColor, normalizeStatus } from "@/lib/utils";
 import { InactivityBadge } from "./InactivityBadge";
-
-const KANBAN_COLUMNS = [
-    { id: "NEW", title: "New Lead", color: "#3B82F6", border: "border-l-[#3B82F6]" },
-    { id: "CONTACTED", title: "Conversation", color: "#F59E0B", border: "border-l-[#F59E0B]" },
-    { id: "PROPOSAL_SENT", title: "Proposal", color: "#10B981", border: "border-l-[#10B981]" },
-    { id: "PAYMENT_INITIAL", title: "Initial Payment", color: "#8B5CF6", border: "border-l-[#8B5CF6]" },
-    { id: "ACTIVE", title: "Treatment", color: "#EC4899", border: "border-l-[#EC4899]" },
-    { id: "INACTIVE", title: "Inactive", color: "#6B7280", border: "border-l-[#6B7280]" },
-];
 
 interface ClientKanbanProps {
     onSelectClient: (id: string) => void;
@@ -38,119 +21,121 @@ interface ClientKanbanProps {
 }
 
 export function ClientKanban({ onSelectClient, sortBy, sortOrder }: ClientKanbanProps) {
-    const [columns, setColumns] = useState<Record<string, { id: string; title: string; color: string; border: string; items: any[] }>>({});
+    const [pipelines, setPipelines] = useState<any[]>([]);
+    const [clientsByStage, setClientsByStage] = useState<Record<string, any[]>>({});
     const [loading, setLoading] = useState(true);
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [editingStage, setEditingStage] = useState<string | null>(null);
 
-    const fetchClients = useCallback(async () => {
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            const { data: pipelineData } = await supabase.from("pipelines").select("*").order("position", { ascending: true });
+            const { data: clientData } = await supabase
                 .from("clients")
                 .select("*")
                 .order(sortBy, { ascending: sortOrder === "asc" });
 
-            if (error) {
-                console.error("Error fetching clients:", error);
-                setLoading(false);
-                return;
+            const DEFAULT_STAGES = [
+                { id: "NEW", name: "NEW LEAD", color: "#3B82F6", position: 0 },
+                { id: "CONTACTED", name: "CONVERSATION", color: "#F59E0B", position: 1 },
+                { id: "PROPOSAL_SENT", name: "PROPOSAL", color: "#10B981", position: 2 },
+                { id: "PAYMENT_INITIAL", name: "INITIAL PAYMENT", color: "#8B5CF6", position: 3 },
+                { id: "ACTIVE", name: "TREATMENT", color: "#EC4899", position: 4 },
+                { id: "INACTIVE", name: "INACTIVE", color: "#6B7280", position: 5 }
+            ];
+
+            const basePipelines = (pipelineData && pipelineData.length > 0) ? pipelineData : DEFAULT_STAGES;
+            
+            const grouped: Record<string, any[]> = {};
+            const matchedIds = new Set();
+
+            basePipelines.forEach(p => {
+                const filtered = clientData?.filter(c => {
+                    if (matchedIds.has(c.id)) return false;
+                    const normalized = normalizeStatus(c.status).trim().toUpperCase();
+                    const pName = p.name.trim().toUpperCase();
+                    const match = normalized === pName || c.status?.trim().toUpperCase() === p.id?.trim().toUpperCase();
+                    if (match) matchedIds.add(c.id);
+                    return match;
+                }) || [];
+                grouped[p.name] = filtered;
+            });
+
+            // Fallback for unmatched clients
+            const unmatched = clientData?.filter(c => !matchedIds.has(c.id)) || [];
+            let finalPipelines = [...basePipelines];
+            
+            if (unmatched.length > 0) {
+                grouped["Uncategorized"] = unmatched;
+                if (!finalPipelines.find(p => p.name.toUpperCase() === "UNCATEGORIZED")) {
+                    finalPipelines.push({ id: "UNCAT", name: "Uncategorized", color: "#94a3b8" });
+                }
             }
 
-            const cols: Record<string, { id: string; title: string; color: string; border: string; items: any[] }> = {};
-            KANBAN_COLUMNS.forEach(col => {
-                cols[col.id] = { ...col, items: (data || []).filter(p => p.status === col.id) };
-            });
-            setColumns(cols);
-        } catch (err) {
-            console.error("Critical error in Kanban:", err);
+            setPipelines(finalPipelines);
+            setClientsByStage(grouped);
+        } catch (error) {
+            console.error("Error loading Kanban data:", error);
         } finally {
             setLoading(false);
         }
     }, [sortBy, sortOrder]);
 
     useEffect(() => {
-        fetchClients();
-
-        // Stable real-time subscription
-        const channel = supabase
-            .channel("kanban-realtime")
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "clients" },
-                () => {
-                    fetchClients();
-                }
-            )
+        fetchData();
+        
+        const channel = supabase.channel('kanban-sync')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pipelines' }, () => fetchData())
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [fetchClients]);
+        return () => { supabase.removeChannel(channel); };
+    }, [fetchData]);
 
     const onDragEnd = async (result: DropResult) => {
-        if (!result.destination) return;
-        const { source, destination, draggableId } = result;
+        const { destination, source, draggableId } = result;
+        if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) return;
 
-        if (source.droppableId !== destination.droppableId) {
-            const sourceColumn = columns[source.droppableId];
-            const destColumn = columns[destination.droppableId];
-            const sourceItems = [...sourceColumn.items];
-            const destItems = [...destColumn.items];
-            const [removed] = sourceItems.splice(source.index, 1);
-            destItems.splice(destination.index, 0, { ...removed, status: destination.droppableId });
+        const newStage = destination.droppableId;
+        
+        // Optimistic update
+        const sourceItems = [...(clientsByStage[source.droppableId] || [])];
+        const destItems = source.droppableId === newStage ? sourceItems : [...(clientsByStage[newStage] || [])];
+        const [removed] = sourceItems.splice(source.index, 1);
+        destItems.splice(destination.index, 0, { ...removed, status: newStage });
 
-            setColumns({
-                ...columns,
-                [source.droppableId]: { ...sourceColumn, items: sourceItems },
-                [destination.droppableId]: { ...destColumn, items: destItems },
-            });
+        setClientsByStage(prev => ({
+            ...prev,
+            [source.droppableId]: sourceItems,
+            [newStage]: destItems
+        }));
 
-            const { error } = await supabase
-                .from("clients")
-                .update({ status: destination.droppableId, updated_at: new Date().toISOString() })
-                .eq("id", draggableId);
-
-            if (error) {
-                console.error("Error updates status:", error);
-                fetchClients();
-            }
-        }
-    };
-
-    const toggleSelect = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
-    };
-
-    const handleBulkMove = async (newStatus: string) => {
-        if (selectedIds.length === 0) return;
-
+        // Database update
         const { error } = await supabase
             .from("clients")
-            .update({ status: newStatus, updated_at: new Date().toISOString() })
-            .in("id", selectedIds);
+            .update({ status: newStage, updated_at: new Date().toISOString() })
+            .eq("id", draggableId);
 
         if (error) {
-            console.error("Error bulk moving clients:", error);
-        } else {
-            setSelectedIds([]);
-            fetchClients();
+            console.error("Error updating client stage:", error);
+            fetchData();
         }
     };
 
-    const formatDatePrecise = (dateString: string | null) => {
-        if (!dateString) return "-";
-        const date = new Date(dateString);
-        return date.toLocaleString("es-ES", {
-            day: "2-digit",
-            month: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false
-        }).replace(",", "");
+    const handleUpdatePipelineName = async (id: string, oldName: string, newName: string) => {
+        if (!newName || newName === oldName) {
+            setEditingStage(null);
+            return;
+        }
+        await supabase.from("pipelines").update({ name: newName }).eq("id", id);
+        setEditingStage(null);
+        fetchData();
+    };
+
+    const handleDeletePipeline = async (id: string, name: string) => {
+        if ((clientsByStage[name]?.length || 0) > 0) return;
+        await supabase.from("pipelines").delete().eq("id", id);
+        fetchData();
     };
 
     const getSourceIcon = (source: string | null) => {
@@ -158,173 +143,138 @@ export function ClientKanban({ onSelectClient, sortBy, sortOrder }: ClientKanban
             case "instagram": return <Instagram className="h-2.5 w-2.5 text-pink-500" />;
             case "facebook": return <Facebook className="h-2.5 w-2.5 text-blue-600" />;
             case "whatsapp": return <MessageCircle className="h-2.5 w-2.5 text-green-500" />;
-            default: return <User className="h-2.5 w-2.5 text-slate-400" />;
+            default: return <Tag className="h-2.5 w-2.5 text-slate-400" />;
         }
     };
 
-    if (loading && Object.keys(columns).length === 0) {
+    if (loading && pipelines.length === 0) {
         return (
-            <div className="flex items-center justify-center h-[400px]">
-                <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+            <div className="flex items-center justify-center p-20">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-primary" />
             </div>
         );
     }
 
     return (
-        <div className="flex-1 flex flex-col min-h-0 relative">
-            {/* Bulk Action Bar */}
-            {selectedIds.length > 0 && (
-                <div className="absolute top-[-60px] left-0 right-0 z-[100] flex justify-center animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="bg-slate-900 text-white rounded-2xl px-6 py-3 shadow-2xl flex items-center gap-6 border border-slate-800">
-                        <div className="flex items-center gap-2">
-                            <div className="h-6 w-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-black">
-                                {selectedIds.length}
-                            </div>
-                            <span className="text-xs font-bold uppercase tracking-widest text-slate-300">Selected Items</span>
-                        </div>
-                        <div className="h-6 w-[1px] bg-slate-800" />
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">Move to:</span>
-                            <div className="flex gap-1">
-                                {KANBAN_COLUMNS.map(col => (
-                                    <button
-                                        key={col.id}
-                                        onClick={() => handleBulkMove(col.id)}
-                                        className="px-2 py-1 rounded-lg text-[9px] font-bold hover:bg-white/10 transition-colors border border-white/5"
-                                        style={{ color: col.color }}
-                                    >
-                                        {col.title.split(" ")[0]}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => setSelectedIds([])}
-                            className="p-1 hover:bg-white/10 rounded-full transition-colors"
-                        >
-                            <X className="h-4 w-4 text-slate-400" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div className="flex-1 flex gap-0.5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-200">
+        <div className="flex-1 flex flex-col min-h-0 h-[calc(100vh-180px)]">
+            <div className="flex-1 flex gap-4 overflow-x-auto pb-4 px-1">
                 <DragDropContext onDragEnd={onDragEnd}>
-                    {KANBAN_COLUMNS.map((colDef) => {
-                        const column = columns[colDef.id] || { ...colDef, items: [] };
-                        return (
-                            <div key={column.id} className="flex-1 min-w-[200px] flex flex-col bg-slate-50/30 border-r border-slate-200/60 last:border-r-0 overflow-hidden first:rounded-l-2xl last:rounded-r-2xl">
-                                <div className="p-2.5 flex items-center justify-between shrink-0 shadow-sm" style={{ backgroundColor: column.color }}>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-[10px] font-black text-white uppercase tracking-wider">{column.title}</h3>
-                                        <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-[9px] font-bold text-white border border-white/10">{column.items.length}</span>
-                                    </div>
-                                    <MoreHorizontal className="h-3.5 w-3.5 text-white/70" />
-                                </div>
-
-                                <Droppable droppableId={column.id}>
-                                    {(provided, snapshot) => (
-                                        <div
-                                            {...provided.droppableProps}
-                                            ref={provided.innerRef}
-                                            className="flex-1 min-h-0 overflow-hidden relative"
-                                        >
-                                            <ScrollArea className="h-full w-full">
-                                                <div className={`p-1 space-y-0.5 min-h-full transition-all duration-300 ${snapshot.isDraggingOver ? 'bg-white/50' : ''}`}>
-                                                    {column.items.map((item, index) => (
-                                                        <Draggable key={item.id} draggableId={item.id} index={index}>
-                                                            {(provided, snapshot) => (
-                                                                <div
-                                                                    ref={provided.innerRef}
-                                                                    {...provided.draggableProps}
-                                                                    {...provided.dragHandleProps}
-                                                                    onClick={() => onSelectClient(item.id)}
-                                                                    className="group outline-none relative"
-                                                                >
-                                                                    {/* Checkbox on hover/selected */}
-                                                                    <div
-                                                                        className={`absolute top-2.5 left-2.5 z-20 transition-opacity ${selectedIds.includes(item.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                                                                        onClick={(e) => toggleSelect(item.id, e)}
-                                                                    >
-                                                                        <Checkbox
-                                                                            checked={selectedIds.includes(item.id)}
-                                                                            className="h-4 w-4 bg-white/80 border-slate-200 shadow-sm data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600 transition-all duration-200"
-                                                                        />
-                                                                    </div>
-
-                                                                    <Card
-                                                                        className={`cursor-pointer border-none shadow-sm hover:shadow-md transition-all duration-200 rounded-xl overflow-hidden bg-white ${snapshot.isDragging ? 'shadow-xl ring-2 ring-blue-400/20 z-50' : ''} ${selectedIds.includes(item.id) ? 'ring-2 ring-purple-500/50 bg-purple-50/5' : ''}`}
-                                                                        style={{ borderLeft: `4px solid ${column.color}` }}
-                                                                    >
-                                                                        <div className="p-2.5 flex flex-col gap-2">
-                                                                            <div className="flex justify-between items-start">
-                                                                                <div className={`flex flex-col min-w-0 transition-all duration-200 ${selectedIds.includes(item.id) ? 'pl-5' : 'group-hover:pl-5'}`}>
-                                                                                    <span className="text-[14px] font-bold text-slate-900 tracking-tight leading-none truncate">
-                                                                                        {item.name}
-                                                                                    </span>
-                                                                                    <div className="mt-1.5 self-start">
-                                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100/50 uppercase tracking-tight">
-                                                                                            {item.service || "General"}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-50 border border-slate-100 shrink-0">
-                                                                                    {getSourceIcon(item.source)}
-                                                                                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-tighter">{item.source || "Web"}</span>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div className="flex flex-col gap-1.5">
-                                                                                <div className="flex items-center justify-between">
-                                                                                    {item.phone && (
-                                                                                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600 leading-none">
-                                                                                            <Phone className="h-3 w-3 text-slate-400" />
-                                                                                            {item.phone}
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {item.estimated_budget && (
-                                                                                        <div className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[9px] font-black border border-emerald-100/50">
-                                                                                            {item.estimated_budget}
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                                
-                                                                                <InactivityBadge lastContactAt={item.last_contact_at} className="mt-1" />
-
-                                                                                <div className="pt-1.5 border-t border-slate-50 flex flex-col gap-1">
-                                                                                    <div className="flex items-center justify-between text-[8px] font-bold text-slate-400 uppercase tracking-tighter leading-none">
-                                                                                        <span className="flex items-center gap-1">
-                                                                                            <Clock className="h-2 w-2 opacity-50" />
-                                                                                            Created: {formatDatePrecise(item.created_at)}
-                                                                                        </span>
-                                                                                        <span className="flex items-center gap-1 text-slate-500">
-                                                                                            <Clock className="h-2 w-2 text-blue-400" />
-                                                                                            Updated: {formatDatePrecise(item.updated_at)}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </Card>
-                                                                </div>
-                                                            )}
-                                                        </Draggable>
-                                                    ))}
-                                                    {provided.placeholder}
-                                                </div>
-                                            </ScrollArea>
-                                        </div>
+                    {pipelines.map(pipeline => (
+                        <div 
+                            key={pipeline.id} 
+                            className="flex-1 min-w-[220px] shrink-0 flex flex-col rounded-[12px] overflow-hidden border border-[rgba(0,0,0,0.05)] shadow-sm h-full transition-all"
+                            style={{ backgroundColor: getLightColor(pipeline.color || "#EA580C") }}
+                        >
+                            <div className="p-2.5 flex items-center justify-between group">
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    {editingStage === pipeline.id ? (
+                                        <input 
+                                            autoFocus
+                                            className="bg-transparent border-none p-0 text-[10px] font-bold uppercase tracking-wider focus:ring-0 w-full"
+                                            style={{ color: pipeline.color }}
+                                            defaultValue={pipeline.name}
+                                            onBlur={(e) => handleUpdatePipelineName(pipeline.id, pipeline.name, e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                        />
+                                    ) : (
+                                    <h3 
+                                        className="text-[11px] font-semibold uppercase tracking-wide truncate cursor-text"
+                                        style={{ color: pipeline.color }}
+                                        onClick={() => setEditingStage(pipeline.id)}
+                                    >
+                                        {pipeline.name}
+                                    </h3>
                                     )}
-                                </Droppable>
+                                    <span 
+                                        className="px-2 py-0.5 rounded-md text-[10px] font-semibold shrink-0"
+                                        style={{ 
+                                            backgroundColor: adjustColor(pipeline.color || "#000", 180),
+                                            color: getDarkColor(pipeline.color || "#000")
+                                        }}
+                                    >
+                                        {clientsByStage[pipeline.name]?.length || 0}
+                                    </span>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => handleDeletePipeline(pipeline.id, pipeline.name)}
+                                    className={cn(
+                                        "p-1 rounded-md transition-opacity opacity-0 group-hover:opacity-100",
+                                        (clientsByStage[pipeline.name]?.length || 0) > 0 ? "cursor-not-allowed text-slate-300" : "text-slate-400 hover:bg-white/50 hover:text-red-500"
+                                    )}
+                                    disabled={(clientsByStage[pipeline.name]?.length || 0) > 0}
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
                             </div>
-                        );
-                    })}
+
+                            <Droppable droppableId={pipeline.name}>
+                                {(provided, snapshot) => (
+                                    <div
+                                        {...provided.droppableProps}
+                                        ref={provided.innerRef}
+                                        className={cn(
+                                            "flex-1 p-2 space-y-2 transition-colors overflow-y-auto custom-scrollbar",
+                                            snapshot.isDraggingOver && "bg-white/30"
+                                        )}
+                                    >
+                                        {clientsByStage[pipeline.name]?.map((client, index) => (
+                                            <Draggable key={client.id} draggableId={client.id} index={index}>
+                                                {(provided, snapshot) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        {...provided.dragHandleProps}
+                                                        onClick={() => onSelectClient(client.id)}
+                                                    >
+                                                        <div className={cn(
+                                                            "bg-white p-3 rounded-[7px] border shadow-sm cursor-pointer transition-all hover:shadow-md group relative",
+                                                            snapshot.isDragging && "shadow-xl ring-2 ring-orange-primary/20 scale-[1.02] z-50"
+                                                        )}
+                                                        style={{ borderColor: adjustColor(pipeline.color || "#EA580C", 160) }}
+                                                        >
+                                                            <h4 
+                                                            className="text-[13px] font-semibold leading-tight mb-2 truncate"
+                                                            style={{ color: getDarkColor(pipeline.color || "#C2410C") }}
+                                                        >
+                                                            {client.name}
+                                                        </h4>
+                                                            <p className="text-[10px] font-medium uppercase tracking-tight text-text-placeholder mb-3">
+                                                            {client.service || "InfoWeb Plan"}
+                                                        </p>
+                                                            
+                                                            <div className="flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.04)]">
+                                                                <InactivityBadge lastContactAt={client.last_contact_at} />
+                                                                <div 
+                                                                    className="px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                                                                    style={{ 
+                                                                        backgroundColor: adjustColor(pipeline.color || "#000", 200),
+                                                                        color: pipeline.color 
+                                                                    }}
+                                                                >
+                                                                    {getSourceIcon(client.lead_source || client.source)}
+                                                                    <span className="text-[8px] font-bold uppercase tracking-tighter">
+                                                                        {client.lead_source || client.source || "Direct"}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </div>
+                    ))}
                 </DragDropContext>
             </div>
         </div>
     );
 }
 
-const XIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-);
+function adjustColor(hex: string, amount: number) {
+    return '#' + hex.replace(/^#/, '').replace(/../g, hex => ('00' + Math.min(255, Math.max(0, parseInt(hex, 16) + amount)).toString(16)).slice(-2));
+}
